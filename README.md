@@ -60,3 +60,7 @@ content. Environment variables: `AGENT_VIEW_PORT`, `AGENT_VIEW_HOST`,
   can't be detected that way and shows as running.
 - Large transcripts only load the last 3 MB / 400 items by default. Click "全部"
   (all) to load everything.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
