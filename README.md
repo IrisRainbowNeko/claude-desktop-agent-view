@@ -14,6 +14,8 @@ the Claude Desktop Code tab's Browser pane, and it also works in any browser.
   calls with their results. The transcript follows new output live.
 - **Live updates** are pushed over SSE.
 
+![List view with a subagent's transcript open and a tool-call group expanded](docs/transcript-view.png)
+
 Stdlib Python 3 only, nothing to install.
 
 ## Data sources
