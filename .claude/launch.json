@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "agent-view",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["server.py", "--port", "7777", "--reuse"],
+      "port": 7777
+    }
+  ]
+}

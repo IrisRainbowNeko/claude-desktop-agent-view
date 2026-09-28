@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent View</title>
+<style>
+  :root {
+    --bg: #1b1b1a; --panel: #232322; --card: #2a2a28; --line: #3a3a37; --text: #e8e6e1;
+    --dim: #9a978f; --faint: #6d6a63; --accent: #d97757;
+    --run: #4fb477; --wait: #e0a43c; --err: #e06c5f; --done: #7c8a9a;
+    --mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f7f6f2; --panel: #efede7; --card: #fff; --line: #dcd9d0; --text: #23221f;
+            --dim: #6b685f; --faint: #9c988d; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.45 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+  button { font: inherit; color: inherit; background: none; border: 1px solid var(--line);
+    border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+  button:hover { border-color: var(--dim); }
+
+  header { height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+    border-bottom: 1px solid var(--line); background: var(--panel); }
+  header .brand { font-weight: 600; letter-spacing: .2px; }
+  header .spacer { flex: 1; }
+  .pill { font-size: 11px; color: var(--dim); display: inline-flex; align-items: center; gap: 5px; }
+  #toggleSessions { display: none; }
+
+  .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr) minmax(0, 1.1fr);
+    height: calc(100% - 40px); }
+  .layout.no-detail { grid-template-columns: 260px minmax(0, 1fr); }
+  .layout.no-detail #detail { display: none; }
+
+  #sessions { border-right: 1px solid var(--line); overflow: auto; background: var(--panel); }
+  #sessions .filter { padding: 8px 10px; display: flex; gap: 6px; align-items: center;
+    color: var(--dim); font-size: 12px; border-bottom: 1px solid var(--line); position: sticky;
+    top: 0; background: var(--panel); z-index: 1; }
+  .sess { padding: 8px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .sess:hover { background: var(--card); }
+  .sess.active { background: var(--card); box-shadow: inset 3px 0 var(--accent); }
+  .sess .t { display: flex; gap: 6px; align-items: baseline; }
+  .sess .t span.title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sess .m { color: var(--faint); font-size: 11px; margin-top: 2px; padding-left: 14px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  #map { overflow: auto; padding: 14px 16px 40px; }
+  #map h2 { font-size: 15px; margin: 0 0 2px; font-weight: 600; }
+  #map .sub { color: var(--dim); font-size: 12px; margin-bottom: 14px; }
+  .counts { display: flex; gap: 12px; margin-bottom: 14px; font-size: 12px; color: var(--dim); flex-wrap: wrap; }
+  .counts b { color: var(--text); font-weight: 600; }
+
+  .tree { list-style: none; margin: 0; padding: 0; }
+  .tree .children { list-style: none; margin: 0 0 0 14px; padding: 0 0 0 16px;
+    border-left: 1px solid var(--line); }
+  .tree .children > li { position: relative; }
+  .tree .children > li::before { content: ""; position: absolute; left: -16px; top: 22px;
+    width: 14px; border-top: 1px solid var(--line); }
+  .tree .children > li:last-child::after { content: ""; position: absolute; left: -17px;
+    top: 23px; bottom: 0; width: 3px; background: var(--bg); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; margin: 6px 0; cursor: pointer; max-width: 640px; }
+  .card:hover { border-color: var(--dim); }
+  .card.selected { border-color: var(--accent); }
+  .card .row1 { display: flex; align-items: center; gap: 7px; }
+  .card .label { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { font-size: 10.5px; color: var(--dim); border: 1px solid var(--line); border-radius: 4px;
+    padding: 0 5px; white-space: nowrap; }
+  .card .tool { margin-top: 5px; font-family: var(--mono); font-size: 11.5px; color: var(--text);
+    background: var(--bg); border-radius: 5px; padding: 3px 7px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .card .tool .n { color: var(--accent); margin-right: 6px; }
+  .card .stats { margin-top: 5px; color: var(--dim); font-size: 11.5px; display: flex;
+    gap: 10px; flex-wrap: wrap; }
+  .card .stats .err { color: var(--err); }
+
+  .viewsw { margin-left: auto; display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .viewsw button { border: none; border-radius: 0; padding: 2px 9px; font-size: 12px; color: var(--dim); }
+  .viewsw button.on { background: var(--card); color: var(--text); }
+
+  /* graph view: root on the left, children fan out to the right with elbow connectors */
+  .graph { overflow: auto; padding: 4px 2px 12px; }
+  .hn { display: flex; align-items: center; }
+  .hkids { display: flex; flex-direction: column; margin-left: 20px; position: relative; }
+  .hkids::before { content: ""; position: absolute; left: -20px; top: 50%; width: 20px;
+    border-top: 1px solid var(--line); }
+  .hkids > .hn { position: relative; padding: 4px 0 4px 20px; }
+  .hkids > .hn::before { content: ""; position: absolute; left: 0; top: 50%; width: 20px;
+    border-top: 1px solid var(--line); }
+  .hkids > .hn::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+    border-left: 1px solid var(--line); }
+  .hkids > .hn:first-child::after { top: 50%; }
+  .hkids > .hn:last-child::after { bottom: 50%; }
+  .hkids > .hn:only-child::after { display: none; }
+  .gcard { background: var(--card); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px;
+    width: 260px; flex: none; cursor: pointer; }
+  .gcard:hover { border-color: var(--dim); }
+  .gcard.selected { border-color: var(--accent); }
+  .gcard .t { display: flex; align-items: center; gap: 7px; }
+  .gcard .t .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .gcard.root .t .label { font-weight: 600; }
+  .gcard .m { color: var(--faint); font-size: 11.5px; margin-top: 2px; padding-left: 15px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gcard .m .err { color: var(--err); }
+  .gcard .tl { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-top: 3px; padding-left: 15px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gcard .tl .n { color: var(--accent); margin-right: 5px; }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--faint); display: inline-block; }
+  .dot.running { background: var(--run); animation: pulse 1.4s ease-in-out infinite; }
+  .dot.waiting { background: var(--wait); animation: pulse 1s ease-in-out infinite; }
+  .dot.done { background: var(--done); }
+  .dot.stale { background: var(--err); opacity: .6; }
+  .dot.idle, .dot.ended { background: var(--faint); }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .st { font-size: 11px; color: var(--dim); white-space: nowrap; }
+  .st.running { color: var(--run); } .st.waiting { color: var(--wait); }
+
+  #detail { border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+  #detail .dh { display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+    border-bottom: 1px solid var(--line); background: var(--panel); }
+  #detail .dh .label { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #detail .dh label { color: var(--dim); font-size: 12px; display: flex; gap: 4px; align-items: center; }
+  #log { flex: 1; overflow: auto; padding: 10px 12px 60px; }
+  .msg { margin: 8px 0; }
+  .msg .who { font-size: 11px; color: var(--faint); margin-bottom: 2px; }
+  .msg .body { white-space: pre-wrap; word-break: break-word; }
+  .msg.user .body { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; }
+  .msg.thinking .body { color: var(--faint); font-style: italic; max-height: 4.4em; overflow: hidden; cursor: pointer; }
+  .msg.thinking.open .body { max-height: none; }
+  .msg.system .body { color: var(--faint); text-align: center; font-size: 12px; }
+  .tu { font-family: var(--mono); font-size: 12px; border: 1px solid var(--line); border-radius: 6px;
+    margin: 6px 0; overflow: hidden; }
+  .tu .h { padding: 4px 8px; cursor: pointer; display: flex; gap: 8px; background: var(--card); }
+  .tu .h .n { color: var(--accent); flex: none; }
+  .tu .h .b { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .tu .h .r { flex: none; color: var(--faint); }
+  .tu .h .r.err { color: var(--err); }
+  .tu .h .r.pending { color: var(--run); }
+  .tu pre { margin: 0; padding: 6px 8px; white-space: pre-wrap; word-break: break-word; max-height: 360px;
+    overflow: auto; border-top: 1px solid var(--line); font-size: 11.5px; }
+  .tu pre.res { color: var(--dim); }
+  .tu pre.res.err { color: var(--err); }
+  .tg { margin: 6px 0; }
+  .tg > .gh { font-size: 12px; color: var(--dim); cursor: pointer; display: flex; gap: 8px;
+    align-items: center; padding: 3px 2px; user-select: none; }
+  .tg > .gh:hover { color: var(--text); }
+  .tg > .gh .caret { font-size: 9px; width: 10px; flex: none; transition: transform .1s; }
+  .tg.open > .gh .caret { transform: rotate(90deg); }
+  .tg > .gh .names { font-family: var(--mono); font-size: 11.5px; color: var(--faint); flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tg > .gh .r { flex: none; color: var(--faint); font-family: var(--mono); font-size: 11.5px; }
+  .tg > .gh .r.err { color: var(--err); }
+  .tg > .gh .r.pending { color: var(--run); }
+  .tg > .gb { margin-left: 5px; padding-left: 10px; border-left: 1px solid var(--line); }
+  .tg:not(.open) > .gb { display: none; }
+  .note { color: var(--faint); font-size: 12px; text-align: center; margin: 8px 0; }
+  .empty { color: var(--faint); padding: 40px 20px; text-align: center; }
+
+  /* narrow: the Browser pane beside a conversation is usually < 900px wide */
+  @media (max-width: 900px) {
+    #toggleSessions { display: inline-block; }
+    .layout, .layout.no-detail { grid-template-columns: minmax(0, 1fr); position: relative; }
+    #sessions { position: absolute; inset: 0 auto 0 0; width: min(300px, 85vw); z-index: 5;
+      transform: translateX(-100%); transition: transform .15s; }
+    body.show-sessions #sessions { transform: none; box-shadow: 4px 0 16px #0006; }
+    #detail { position: absolute; inset: 0; z-index: 4; background: var(--bg); border-left: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <button id="toggleSessions" title="会话列表">☰</button>
+  <span class="brand">Agent View</span>
+  <span class="spacer"></span>
+  <span class="pill" id="hookState"></span>
+  <span class="pill" id="connState"><span class="dot"></span>连接中</span>
+</header>
+<div class="layout no-detail" id="layout">
+  <aside id="sessions">
+    <div class="filter"><label><input type="checkbox" id="onlyActive"> 只看活跃</label></div>
+    <div id="sessList"></div>
+  </aside>
+  <section id="map"><div class="empty">加载中…</div></section>
+  <section id="detail">
+    <div class="dh">
+      <button id="closeDetail" title="关闭">←</button>
+      <span class="dot" id="dDot"></span>
+      <span class="label" id="dLabel"></span>
+      <label><input type="checkbox" id="follow" checked> 跟随</label>
+      <button id="loadFull" title="加载完整记录">全部</button>
+    </div>
+    <div id="log"></div>
+  </section>
+</div>
+<script>
+"use strict";
+const STATUS = { running: "运行中", waiting: "等待确认", idle: "空闲", done: "已完成",
+                 stale: "无响应", ended: "已结束" };
+const $ = (id) => document.getElementById(id);
+const state = { sessions: [], sid: null, detail: null, aid: null, transcript: null,
+                full: false, open: new Set(), view: localStorage.getItem("agentView.view") || "list", groups: new Map(), hooksLast: 0, clockSkew: 0 };
+
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c instanceof Node ? c : String(c));
+  return el;
+}
+const now = () => Date.now() / 1000 + state.clockSkew;
+function dur(s) {
+  if (s == null || s < 0) return "";
+  s = Math.round(s);
+  if (s < 60) return s + "s";
+  if (s < 3600) return Math.floor(s / 60) + "m" + String(s % 60).padStart(2, "0") + "s";
+  return Math.floor(s / 3600) + "h" + String(Math.floor(s % 3600 / 60)).padStart(2, "0") + "m";
+}
+function ago(t) {
+  if (!t) return "";
+  const s = now() - t;
+  if (s < 60) return "刚刚";
+  if (s < 3600) return Math.floor(s / 60) + " 分钟前";
+  if (s < 86400) return Math.floor(s / 3600) + " 小时前";
+  return Math.floor(s / 86400) + " 天前";
+}
+const ktok = (n) => !n ? "0" : n < 1000 ? String(n) : n < 1e6 ? (n / 1000).toFixed(1) + "k" : (n / 1e6).toFixed(2) + "M";
+const active = (st) => st === "running" || st === "waiting";
+const base = (p) => (p || "").split("/").filter(Boolean).pop() || p || "";
+
+async function getJSON(url) {
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error(r.status + " " + url);
+  return r.json();
+}
+function debounce(fn, ms) {
+  let t = null;
+  return () => { clearTimeout(t); t = setTimeout(fn, ms); };
+}
+
+// ------------------------------------------------------------------ sessions
+async function loadSessions() {
+  const d = await getJSON("/api/sessions");
+  state.clockSkew = d.now - Date.now() / 1000;
+  state.sessions = d.sessions;
+  state.hooksLast = d.hooks_last;
+  renderSessions();
+  renderHookState();
+  if (!state.sid && d.sessions.length) {
+    const pick = d.sessions.find((s) => active(s.status)) || d.sessions[0];
+    selectSession(pick.id);
+  }
+}
+function renderSessions() {
+  const only = $("onlyActive").checked;
+  const list = state.sessions.filter((s) => !only || active(s.status) || s.running_subagents);
+  $("sessList").replaceChildren(...(list.length ? list.map((s) =>
+    h("div", { class: "sess" + (s.id === state.sid ? " active" : ""),
+               onclick: () => { selectSession(s.id); document.body.classList.remove("show-sessions"); } },
+      h("div", { class: "t" }, h("span", { class: "dot " + s.status }),
+        h("span", { class: "title", title: s.title }, s.title)),
+      h("div", { class: "m" },
+        [base(s.cwd) || s.project, ago(s.mtime),
+         s.subagents ? `${s.subagents} 个子 agent` + (s.running_subagents ? ` · ${s.running_subagents} 运行中` : "") : ""]
+          .filter(Boolean).join(" · ")))
+  ) : [h("div", { class: "empty" }, "没有会话")]));
+}
+function renderHookState() {
+  const on = state.hooksLast && now() - state.hooksLast < 3600;
+  $("hookState").replaceChildren(h("span", { class: "dot " + (on ? "done" : "") }),
+    on ? "hooks 已接入" : "hooks 未检测到（仅 jsonl）");
+  $("hookState").title = on ? "最近一次 hook 事件：" + ago(state.hooksLast)
+                            : "运行 install_hooks.py 之后可以拿到等待确认、回合结束等精确状态";
+}
+
+// ------------------------------------------------------------------ agent map
+function selectSession(sid) {
+  if (sid !== state.sid) { state.aid = null; state.transcript = null; state.full = false; }
+  state.sid = sid;
+  updateHash();
+  renderSessions();
+  loadDetail();
+  showDetail(!!state.aid);
+}
+async function loadDetail() {
+  if (!state.sid) return;
+  const sid = state.sid;
+  try {
+    const d = await getJSON("/api/session?id=" + encodeURIComponent(sid));
+    if (sid !== state.sid) return;
+    state.detail = d;
+    renderMap();
+  } catch (e) {
+    $("map").replaceChildren(h("div", { class: "empty" }, "读取会话失败：" + e.message));
+  }
+}
+function renderMap() {
+  const d = state.detail;
+  if (!d) return;
+  const byParent = {};
+  for (const n of d.nodes) (byParent[n.parent || ""] ||= []).push(n);
+  for (const k in byParent) byParent[k].sort((a, b) => (a.started || 0) - (b.started || 0));
+  const subs = d.nodes.filter((n) => n.id !== "main");
+  const c = (st) => subs.filter((n) => n.status === st).length;
+
+  const renderNode = (n) => {
+    const kids = byParent[n.id] || [];
+    return h("li", {}, card(n), kids.length ? h("ul", { class: "children" }, kids.map(renderNode)) : null);
+  };
+  const renderGraphNode = (n) => {
+    const kids = byParent[n.id] || [];
+    return h("div", { class: "hn" }, gcard(n), kids.length ? h("div", { class: "hkids" }, kids.map(renderGraphNode)) : null);
+  };
+  const roots = byParent[""] || [];
+  const s = d.session;
+  const scroll = $("map").scrollTop, gscroll = $("map").querySelector(".graph")?.scrollLeft || 0;
+  const setView = (v) => () => { state.view = v; localStorage.setItem("agentView.view", v); renderMap(); };
+  const graph = state.view === "graph";
+  $("map").replaceChildren(
+    h("h2", { title: s.title }, s.title),
+    h("div", { class: "sub" }, [s.cwd, s.entrypoint, s.started && "开始于 " + ago(s.started)].filter(Boolean).join(" · ")),
+    h("div", { class: "counts" },
+      subs.length ? [
+        h("span", {}, "子 agent ", h("b", {}, subs.length)),
+        h("span", {}, "运行中 ", h("b", {}, c("running"))),
+        c("waiting") ? h("span", {}, "等待确认 ", h("b", {}, c("waiting"))) : null,
+        h("span", {}, "已完成 ", h("b", {}, c("done"))),
+        c("stale") ? h("span", {}, "无响应 ", h("b", {}, c("stale"))) : null,
+      ] : h("span", {}, "没有子 agent"),
+      h("span", { class: "viewsw" },
+        h("button", { class: graph ? "" : "on", onclick: setView("list") }, "列表"),
+        h("button", { class: graph ? "on" : "", onclick: setView("graph") }, "图"))),
+    graph ? h("div", { class: "graph" }, roots.map(renderGraphNode))
+          : h("ul", { class: "tree" }, roots.map(renderNode)));
+  $("map").scrollTop = scroll;
+  if (graph) $("map").querySelector(".graph").scrollLeft = gscroll;
+}
+function card(n) {
+  const end = active(n.status) ? now() : (n.last || n.mtime);
+  const elapsed = n.started ? end - n.started : null;
+  return h("div", { class: "card" + (n.id === state.aid ? " selected" : ""), onclick: () => selectAgent(n.id) },
+    h("div", { class: "row1" },
+      h("span", { class: "dot " + n.status }),
+      h("span", { class: "label", title: n.label }, n.id === "main" ? "主会话" : n.label),
+      n.background ? h("span", { class: "badge" }, "后台") : null,
+      h("span", { class: "badge" }, n.agent_type || "agent"),
+      h("span", { class: "st " + n.status }, STATUS[n.status] || n.status)),
+    n.tool ? h("div", { class: "tool", title: n.tool.brief },
+      h("span", { class: "n" }, n.tool.name), n.tool.brief || "",
+      n.tool.ts ? h("span", { "data-since": n.tool.ts, "data-prefix": "  · " }, "  · " + dur(now() - n.tool.ts)) : "") : null,
+    h("div", { class: "stats" },
+      elapsed != null ? h("span", active(n.status) ? { "data-since": n.started, "data-prefix": "" } : {},
+        dur(elapsed)) : null,
+      h("span", {}, `${n.tool_calls} 次工具`),
+      h("span", { title: "输出 token" }, "输出 " + ktok(n.out_tokens)),
+      n.context_tokens ? h("span", { title: "最近一次请求的上下文长度" }, "ctx " + ktok(n.context_tokens)) : null,
+      n.errors ? h("span", { class: "err" }, `${n.errors} 次出错`) : null,
+      n.top_tools.length ? h("span", { title: "最常用的工具" },
+        n.top_tools.map(([t, k]) => `${t}×${k}`).join(" ")) : null));
+}
+
+function gcard(n) {
+  const root = n.id === "main";
+  const end = active(n.status) ? now() : (n.last || n.mtime);
+  const elapsed = n.started ? end - n.started : null;
+  const meta = [];
+  if (root && n.model) meta.push(h("span", {}, n.model.replace(/^claude-/, "")));
+  if (elapsed != null) meta.push(h("span", active(n.status) ? { "data-since": n.started, "data-prefix": "" } : {}, dur(elapsed)));
+  if (n.out_tokens) meta.push(h("span", { title: "输出 token" }, "输出 " + ktok(n.out_tokens)));
+  if (n.context_tokens) meta.push(h("span", { title: "最近一次请求的上下文长度" }, "ctx " + ktok(n.context_tokens)));
+  if (n.errors) meta.push(h("span", { class: "err", title: `${n.errors} 次出错` }, `✕${n.errors}`));
+  const sep = meta.flatMap((m, i) => i ? [" · ", m] : [m]);
+  return h("div", { class: "gcard" + (root ? " root" : "") + (n.id === state.aid ? " selected" : ""),
+                    onclick: () => selectAgent(n.id),
+                    title: `${root ? "主会话" : n.label}\n${STATUS[n.status] || n.status} · ${n.tool_calls} 次工具` +
+                           (n.agent_type && !root ? ` · ${n.agent_type}` : "") + (n.background ? " · 后台" : "") },
+    h("div", { class: "t" }, h("span", { class: "dot " + n.status }),
+      h("span", { class: "label" }, root ? (state.detail?.session?.title || "主会话") : n.label)),
+    h("div", { class: "m" }, ...sep),
+    n.tool && active(n.status) ? h("div", { class: "tl" }, h("span", { class: "n" }, n.tool.name), n.tool.brief || "") : null);
+}
+
+// ------------------------------------------------------------------ transcript
+function selectAgent(aid) {
+  if (aid !== state.aid) { state.transcript = null; state.full = false; state.open.clear(); state.groups.clear(); }
+  state.aid = aid;
+  updateHash();
+  renderMap();
+  showDetail(true);
+  loadTranscript(true);
+}
+function showDetail(on) {
+  $("layout").classList.toggle("no-detail", !on);
+  if (!on) state.aid = null;
+}
+async function loadTranscript(scrollEnd) {
+  if (!state.sid || !state.aid) return;
+  const key = state.sid + "/" + state.aid;
+  const q = `/api/transcript?session=${encodeURIComponent(state.sid)}&agent=${encodeURIComponent(state.aid)}` +
+            (state.full ? "&full=1" : "");
+  try {
+    const d = await getJSON(q);
+    if (key !== state.sid + "/" + state.aid) return;
+    state.transcript = d;
+    renderTranscript(scrollEnd);
+  } catch (e) {
+    $("log").replaceChildren(h("div", { class: "empty" }, "读取记录失败：" + e.message));
+  }
+}
+function renderTranscript(scrollEnd) {
+  const node = state.detail?.nodes.find((n) => n.id === state.aid);
+  $("dLabel").textContent = node ? (node.id === "main" ? "主会话" : node.label) : state.aid;
+  $("dDot").className = "dot " + (node?.status || "");
+  const log = $("log");
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+  const d = state.transcript;
+  const results = {};
+  for (const it of d.items) if (it.role === "tool_result") results[it.id] = it;
+  const out = [];
+  if (d.truncated) out.push(h("div", { class: "note" }, "只显示了最近的一部分，点右上角「全部」加载完整记录"));
+  const toggle = (k) => () => { state.open.has(k) ? state.open.delete(k) : state.open.add(k); renderTranscript(false); };
+  // Consecutive tool calls (with their results) form one run; runs of 2+ collapse into a group.
+  const runs = [];
+  let run = null;
+  d.items.forEach((it, i) => {
+    if (it.role === "tool_use" || it.role === "tool_result") {
+      if (!run) runs.push(run = { tools: [], idx: [] });
+      run.idx.push(i);
+      if (it.role === "tool_use") run.tools.push(it);
+    } else {
+      run = null;
+      runs.push({ idx: [i] });
+    }
+  });
+  const renderItem = (it, i, out) => {
+    if (it.role === "tool_result") {
+      if (!d.items.some((x) => x.role === "tool_use" && x.id === it.id))  // orphan (use was cut off)
+        out.push(h("div", { class: "tu" }, h("pre", { class: "res" + (it.is_error ? " err" : "") }, it.text)));
+      return;
+    }
+    if (it.role === "tool_use") {
+      const r = results[it.id], k = "u" + it.id, open = state.open.has(k);
+      const resText = r ? (r.is_error ? "✕ 出错" : "✓") : "…";
+      out.push(h("div", { class: "tu" },
+        h("div", { class: "h", onclick: toggle(k) },
+          h("span", { class: "n" }, it.name), h("span", { class: "b", title: it.brief }, it.brief),
+          h("span", { class: "r" + (r?.is_error ? " err" : r ? "" : " pending") }, resText)),
+        open ? h("pre", {}, it.input) : null,
+        open && r ? h("pre", { class: "res" + (r.is_error ? " err" : "") }, r.text || "(空)") : null));
+      return;
+    }
+    const who = { user: "用户", assistant: "Claude", thinking: "思考", system: "" }[it.role];
+    const k = "t" + i;
+    out.push(h("div", { class: "msg " + it.role + (state.open.has(k) ? " open" : ""),
+                        onclick: it.role === "thinking" ? toggle(k) : null },
+      who ? h("div", { class: "who" }, who + (it.ts ? " · " + new Date(it.ts * 1000).toLocaleTimeString() : "")) : null,
+      h("div", { class: "body" }, it.text)));
+  };
+  runs.forEach((g, gi) => {
+    if (!g.tools || g.tools.length < 2) { g.idx.forEach((i) => renderItem(d.items[i], i, out)); return; }
+    const k = "g" + g.tools[0].id;
+    const pending = g.tools.filter((t) => !results[t.id]).length;
+    const errs = g.tools.filter((t) => results[t.id]?.is_error).length;
+    // default: collapsed, except the live run at the very end so following output stays visible
+    const open = state.groups.has(k) ? state.groups.get(k) : (gi === runs.length - 1 && pending > 0);
+    const counts = new Map();
+    for (const t of g.tools) {
+      const n = t.name.replace(/^mcp__.+?__/, "");  // mcp__server__tool -> tool
+      counts.set(n, (counts.get(n) || 0) + 1);
+    }
+    const names = [...counts].map(([n, c]) => c > 1 ? `${n}×${c}` : n).join(" · ");
+    const body = [];
+    g.idx.forEach((i) => renderItem(d.items[i], i, body));
+    out.push(h("div", { class: "tg" + (open ? " open" : "") },
+      h("div", { class: "gh", onclick: () => { state.groups.set(k, !open); renderTranscript(false); } },
+        h("span", { class: "caret" }, "▶"),
+        h("span", {}, `${g.tools.length} 次工具调用`),
+        h("span", { class: "names", title: names }, names),
+        h("span", { class: "r" + (pending ? " pending" : errs ? " err" : "") },
+          pending ? `… ${pending} 进行中` : errs ? `✕ ${errs} 出错` : "✓")),
+      h("div", { class: "gb" }, ...body)));
+  });
+  if (!d.items.length) out.push(h("div", { class: "empty" }, "还没有内容"));
+  log.replaceChildren(...out);
+  if (scrollEnd || ($("follow").checked && atBottom)) log.scrollTop = log.scrollHeight;
+}
+
+// ------------------------------------------------------------------ live updates
+const refreshDetail = debounce(loadDetail, 400);
+const refreshTranscript = debounce(() => loadTranscript(false), 700);
+const refreshSessions = debounce(() => loadSessions().catch(() => {}), 1500);
+
+function connect() {
+  const es = new EventSource("/events");
+  es.onopen = () => $("connState").replaceChildren(h("span", { class: "dot running" }), "实时");
+  es.onerror = () => $("connState").replaceChildren(h("span", { class: "dot stale" }), "已断开，重连中");
+  es.onmessage = (m) => {
+    const e = JSON.parse(m.data);
+    if (e.type === "hello") { refreshSessions(); if (state.sid) refreshDetail(); return; }
+    const sids = e.type === "changed" ? e.sessions : [e.session];
+    if (e.type === "hook") state.hooksLast = now();
+    if (sids.includes(state.sid)) {
+      refreshDetail();
+      if (state.aid && (e.type === "changed" || e.agent === state.aid)) refreshTranscript();
+    }
+    refreshSessions();
+  };
+}
+
+function updateHash() {
+  const p = new URLSearchParams();
+  if (state.sid) p.set("s", state.sid);
+  if (state.aid) p.set("a", state.aid);
+  history.replaceState(null, "", "#" + p.toString());
+}
+
+$("onlyActive").onchange = renderSessions;
+$("toggleSessions").onclick = () => document.body.classList.toggle("show-sessions");
+$("closeDetail").onclick = () => { showDetail(false); updateHash(); renderMap(); };
+$("loadFull").onclick = () => { state.full = true; loadTranscript(false); };
+// tick: only touch the live duration texts so clicks are never swallowed by a re-render
+setInterval(() => {
+  for (const el of document.querySelectorAll("[data-since]"))
+    el.textContent = el.dataset.prefix + dur(now() - Number(el.dataset.since));
+  renderHookState();
+}, 1000);
+
+(function init() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (p.get("s")) { state.sid = p.get("s"); state.aid = p.get("a"); }
+  loadSessions().catch((e) => $("map").replaceChildren(h("div", { class: "empty" }, "连不上服务：" + e.message)));
+  if (state.sid) { loadDetail(); if (state.aid) { showDetail(true); loadTranscript(true); } }
+  connect();
+})();
+</script>
+</body>
+</html>

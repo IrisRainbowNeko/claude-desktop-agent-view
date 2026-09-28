@@ -1,0 +1,13 @@
+# systemd user unit: keeps the Agent View server running independently of any session.
+# Replace /path/to/cc-agent-view with where you cloned this repo, then:
+#   sed "s|/path/to/cc-agent-view|$PWD|" agent-view.service > ~/.config/systemd/user/agent-view.service
+#   systemctl --user daemon-reload && systemctl --user enable --now agent-view
+[Unit]
+Description=Claude Code Agent View dashboard
+
+[Service]
+ExecStart=/usr/bin/env python3 "/path/to/cc-agent-view/server.py" --port 7777
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
