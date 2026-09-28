@@ -3,6 +3,8 @@
 A local dashboard for Claude Code sessions and their subagents. It opens inside
 the Claude Desktop Code tab's Browser pane, and it also works in any browser.
 
+![Graph view of a session with three levels of subagents](docs/graph-view.png)
+
 - **Agent map**: shows the main session and its subagents as a tree, based on
   who spawned which subagent. Switch between an indented list and a
   left-to-right graph with the 列表 / 图 toggle (remembered per browser). Each card shows status (running / waiting /
