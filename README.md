@@ -29,12 +29,12 @@ Stdlib Python 3 only, nothing to install.
 
 1. Start the server. Pick one of these:
    - In Desktop, open the Browser pane and choose the `agent-view` config
-     (from `.claude/launch.json`), or ask Claude to open it. Desktop starts the
-     server for you.
+     (from `.claude/launch.json`), or ask Claude to open it. The config runs
+     `preview.py`, a small proxy on a port Desktop picks. It forwards to the
+     server on 7777 and starts that server first if it is not running, so the
+     pane works whether the hooks started the server already or not.
    - Keep it running permanently with `agent-view.service` (see the comments at
-     the top of that file), or let the hooks start it (below). The `agent-view`
-     config passes `--reuse`, so when a server is already on the port it just
-     stands by and the pane shows the running one.
+     the top of that file), or let the hooks start it (below).
    - Or run `python3 server.py` by hand and open http://127.0.0.1:7777.
 2. (Optional) Install the hooks:
    ```bash
@@ -50,6 +50,26 @@ Stdlib Python 3 only, nothing to install.
    `server.py` detached from the session (log: `~/.local/state/agent-view.log`).
    Other events never start it; they are dropped silently while it is down. Set
    `AGENT_VIEW_AUTOSTART=0` to turn this off.
+
+   The installer also adds a `SessionStart` hook, `autopreview.py`, that makes
+   the preview available in every project. In Desktop sessions it adds an
+   `agent-view` entry to the project's `.claude/launch.json`, so you can start
+   it from the Browser pane with one click. It creates the file if needed and
+   adds it to `.git/info/exclude`. An existing file keeps its other entries.
+   A `launch.json` that is committed to git is never touched.
+
+   Desktop only runs a session's hooks after you send a message in it. To cover
+   the time before that, the server watches Desktop's session records
+   (`~/.config/Claude*/claude-code-sessions`, or `AGENT_VIEW_DESKTOP_SESSIONS`).
+   When you create a session in a new folder, the entry appears there within a
+   few seconds. Worktree and archived sessions are skipped. For projects that
+   only have CLI transcripts, run `python3 autopreview.py --all` once
+   (`--all --dry-run` lists them first).
+
+   With `AGENT_VIEW_AUTOPREVIEW=auto` the hook also tells Claude to open the
+   preview before its first reply, since only a tool call can open the pane.
+   `AGENT_VIEW_AUTOPREVIEW=0` turns the hook off entirely.
+   Uninstalling the hooks leaves the `launch.json` entries in place.
 
 The server listens on `127.0.0.1` only, since transcripts can contain sensitive
 content. Environment variables: `AGENT_VIEW_PORT`, `AGENT_VIEW_HOST`,

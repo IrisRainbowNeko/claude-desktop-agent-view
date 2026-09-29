@@ -667,6 +667,11 @@ def main():
                 return
     httpd.daemon_threads = True
     threading.Thread(target=watcher, daemon=True).start()
+    try:
+        import autopreview  # Browser pane entry for new Desktop projects; optional
+        threading.Thread(target=autopreview.watch_desktop, daemon=True).start()
+    except Exception as err:
+        print(f"agent-view: autopreview watcher disabled: {err}", flush=True)
     print(f"agent-view: http://{args.host}:{args.port}  (transcripts: {PROJECTS})", flush=True)
     try:
         httpd.serve_forever()

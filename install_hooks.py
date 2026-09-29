@@ -6,7 +6,7 @@
     python3 install_hooks.py --dry-run    # print the resulting settings only
 
 A timestamped backup of settings.json is written before any change. Only hook
-entries whose command points at this directory's hook.py are touched.
+entries whose command points at this directory's hook.py / autopreview.py are touched.
 """
 import argparse
 import json
@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 
 HOOK = Path(__file__).resolve().parent / "hook.py"
+AUTOPREVIEW = HOOK.with_name("autopreview.py")
 SETTINGS = Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude")) / "settings.json"
 TOOL_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "PermissionRequest"]
 OTHER_EVENTS = ["SessionStart", "SessionEnd", "UserPromptSubmit", "Notification",
@@ -25,7 +26,8 @@ OTHER_EVENTS = ["SessionStart", "SessionEnd", "UserPromptSubmit", "Notification"
 
 
 def ours(hook):
-    return isinstance(hook, dict) and str(HOOK) in str(hook.get("command", ""))
+    cmd = str(hook.get("command", "")) if isinstance(hook, dict) else ""
+    return str(HOOK) in cmd or str(AUTOPREVIEW) in cmd
 
 
 def strip(settings):
@@ -55,6 +57,9 @@ def install(settings):
         hooks.setdefault(event, []).append({"matcher": "*", "hooks": [dict(entry)]})
     for event in OTHER_EVENTS:
         hooks.setdefault(event, []).append({"hooks": [dict(entry)]})
+    # Synchronous: in "auto" mode its stdout (the "open the preview" instruction) must reach the context.
+    auto = f"{shlex.quote(sys.executable)} {shlex.quote(str(AUTOPREVIEW))}"
+    hooks["SessionStart"].append({"hooks": [{"type": "command", "command": auto, "timeout": 10}]})
 
 
 def main():
