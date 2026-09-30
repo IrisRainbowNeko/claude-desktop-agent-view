@@ -138,7 +138,7 @@ def watch_desktop(interval=3.0):
                         continue
                     d = json.loads(f.read_text())
                     cwd = Path(d.get("cwd") or "")
-                    if d.get("isArchived") or not cwd.is_absolute() or cwd in done:
+                    if d.get("isArchived") or d.get("sshConfig") or not cwd.is_absolute() or cwd in done:
                         continue
                     done.add(cwd)
                     if cwd.is_dir() and cwd.resolve() != home and "/.claude/worktrees/" not in str(cwd):

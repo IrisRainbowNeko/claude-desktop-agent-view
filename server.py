@@ -8,6 +8,7 @@ Stdlib only. Two data sources are merged:
   polled for changes, so the dashboard works even without hooks.
 * Hook events POSTed by hook.py to /event. These add precise live state
   (waiting for permission, turn finished, subagent stopped).
+* Transcripts of Claude Desktop SSH sessions, mirrored over ssh by remote.py.
 
 Endpoints:
   GET  /                    dashboard (static/index.html)
@@ -21,6 +22,7 @@ import argparse
 import json
 import os
 import queue
+import re
 import sys
 import threading
 import time
@@ -30,6 +32,8 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+import remote
 
 HERE = Path(__file__).resolve().parent
 CLAUDE_DIR = Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude"))
@@ -246,23 +250,52 @@ def get_transcript(path):
     return tr
 
 
-def main_session_files():
+def project_roots():
+    """Mirrors of remote hosts first (they win over Desktop's ssh-* copies), then ~/.claude/projects."""
+    return [root for _, root in remote.roots()] + [PROJECTS]
+
+
+def desktop_ssh_copy(path):
+    """Desktop keeps its own flat copy of SSH sessions in projects/ssh-<session id>/."""
+    return path.parent.parent == PROJECTS and path.parent.name == "ssh-" + path.stem
+
+
+def host_of(path):
+    """ssh host a transcript comes from, None for local ones."""
     try:
-        files = [(p.stat().st_mtime, p) for p in PROJECTS.glob("*/*.jsonl")]
-    except OSError:
-        return []
+        return path.relative_to(remote.MIRROR).parts[0]
+    except ValueError:
+        return "ssh" if desktop_ssh_copy(path) else None
+
+
+def main_session_files():
+    files, seen = [], set()
+    for root in project_roots():
+        for p in root.glob("*/*.jsonl"):
+            if p.stem.startswith("agent-") or p.stem in seen:
+                continue  # flat subagent files of an ssh-* copy / already mirrored
+            seen.add(p.stem)
+            try:
+                files.append((p.stat().st_mtime, p))
+            except OSError:
+                pass
     files.sort(key=lambda x: x[0], reverse=True)
     return files
 
 
 def find_session(sid):
-    if not sid or "/" in sid or ".." in sid:
+    if not sid or "/" in sid or ".." in sid or sid.startswith("agent-"):
         return None
-    hits = list(PROJECTS.glob(f"*/{sid}.jsonl"))
-    return hits[0] if hits else None
+    for root in project_roots():
+        hits = list(root.glob(f"*/{sid}.jsonl"))
+        if hits:
+            return hits[0]
+    return None
 
 
 def subagent_files(session_path):
+    if desktop_ssh_copy(session_path):
+        return sorted(session_path.parent.glob("agent-*.jsonl"))
     d = session_path.with_suffix("") / "subagents"
     return sorted(d.glob("agent-*.jsonl")) if d.is_dir() else []
 
@@ -388,6 +421,7 @@ def session_summary(path, now):
         "title": tr.custom_title or tr.title or (tr.last_prompt or "")[:80] or sid,
         "status": status, "mtime": tr.mtime, "started": tr.first_ts,
         "entrypoint": tr.entrypoint, "subagents": len(subs), "running_subagents": running_subs,
+        "host": host_of(path),
     }
 
 
@@ -400,7 +434,8 @@ def api_sessions(q):
             out.append(session_summary(p, now))
         except OSError:
             pass
-    return {"sessions": out, "hooks_last": LIVE.last_event, "now": now}
+    return {"sessions": out, "hooks_last": LIVE.last_event, "now": now, "remotes": remote.status(),
+            "focused": FOCUS.current}
 
 
 def api_session(q):
@@ -436,8 +471,8 @@ def transcript_path(sid, aid):
         return path
     if "/" in aid or ".." in aid:
         return None
-    p = path.with_suffix("") / "subagents" / f"agent-{aid}.jsonl"
-    return p if p.exists() else None
+    p = next((f for f in subagent_files(path) if f.stem == f"agent-{aid}"), None)
+    return p
 
 
 def api_transcript(q):
@@ -518,6 +553,76 @@ _clients = set()
 _clients_lock = threading.Lock()
 
 
+class DesktopFocus:
+    """Which Code session is focused in Claude Desktop, from lastFocusedAt in its session records."""
+
+    def __init__(self):
+        self.records = {}   # path -> (mtime, cli session id, lastFocusedAt ms)
+        self.current = None
+
+    def poll(self):
+        try:
+            from autopreview import desktop_session_dirs
+            files = [f for d in desktop_session_dirs() for f in d.glob("*/*/local_*.json")]
+        except Exception:
+            return None
+        for f in files:
+            try:
+                m = f.stat().st_mtime
+                if self.records.get(f, (None,))[0] != m:
+                    d = json.loads(f.read_text())
+                    self.records[f] = (m, d.get("cliSessionId"), d.get("lastFocusedAt") or 0)
+            except (OSError, ValueError):
+                pass
+        best = max(self.records.values(), key=lambda r: r[2], default=None)
+        self.current = {"sid": best[1], "at": best[2] / 1000} if best and best[1] else None
+        return self.current
+
+
+FOCUS = DesktopFocus()
+
+
+def desktop_transcript_id(session_id, roots=None):
+    """Resolve only Desktop UUID records, never an arbitrary client-supplied path."""
+    uuid = r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"
+    if not re.fullmatch("local_" + uuid, session_id):
+        raise ValueError("invalid Desktop session id")
+    if roots is None:
+        from autopreview import desktop_session_dirs
+        roots = desktop_session_dirs()
+    ids = set()
+    for root in roots:
+        for record in root.glob(f"*/*/{session_id}.json"):
+            try:
+                sid = json.loads(record.read_text()).get("cliSessionId")
+                if isinstance(sid, str) and re.fullmatch(uuid, sid):
+                    ids.add(sid)
+            except (OSError, ValueError):
+                continue
+    return next(iter(ids)) if len(ids) == 1 else None
+
+
+_index_cache = {}
+
+
+def index_html():
+    """static/index.html with the Markdown/MyST/KaTeX bundle inlined at <!--VENDOR-->.
+
+    Inlined rather than served as separate files so the page stays a single document:
+    it works behind proxies that only pass "/" and the API (e.g. the Desktop SSH pane).
+    """
+    files = [HERE / "static" / n for n in ("index.html", "vendor/katex.css", "vendor/markdown.js")]
+    key = tuple(f.stat().st_mtime if f.exists() else 0 for f in files)
+    if _index_cache.get("key") != key:
+        page = files[0].read_bytes()
+        if all(key[1:]):
+            vendor = (b"<style>" + files[1].read_bytes() + b"</style>\n<script>"
+                      + files[2].read_bytes().replace(b"</script", b"<\\/script") + b"</script>")
+            page = page.replace(b"<!--VENDOR-->", vendor, 1)
+        _index_cache.update(key=key, body=page)
+    return _index_cache["body"]
+
+
 def broadcast(obj):
     data = json.dumps(obj, ensure_ascii=False)
     with _clients_lock:
@@ -531,7 +636,13 @@ def broadcast(obj):
 def watcher(interval=1.0, horizon=86400):
     """Poll transcript mtimes; push `changed` events for sessions that were written."""
     seen = {}
+    focus = None
     while True:
+        f = FOCUS.poll()
+        if f and f != focus:
+            if focus is not None:
+                broadcast({"type": "focus", **f})
+            focus = f
         changed = set()
         now = time.time()
         for mtime, p in main_session_files()[:60]:
@@ -573,9 +684,25 @@ class Handler(BaseHTTPRequestHandler):
         q = parse_qs(u.query)
         try:
             if u.path in ("/", "/index.html"):
-                body = (HERE / "static" / "index.html").read_bytes()
+                sid = None
+                if "desktop_session" in q:
+                    try:
+                        sid = desktop_transcript_id(q["desktop_session"][0])
+                    except ValueError:
+                        return self._json({"error": "invalid Desktop session id"}, 400)
+                    if not sid:
+                        return self._json({"error": "Desktop transcript not found"}, 404)
+                body = index_html()
+                if sid:
+                    bootstrap = f"<script>window.__AGENT_VIEW_DESKTOP_SESSION__={json.dumps(sid)};</script>".encode()
+                    body = body.replace(b"</head>", bootstrap + b"</head>", 1)
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
+                if sid or q.get("embedded") == ["1"]:
+                    self.send_header("Content-Security-Policy", "default-src 'none'; "
+                                     "script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+                                     "img-src 'self' data:; font-src data:; connect-src 'self'; "
+                                     "frame-ancestors app://localhost; base-uri 'none'; form-action 'none'")
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
@@ -672,6 +799,7 @@ def main():
         threading.Thread(target=autopreview.watch_desktop, daemon=True).start()
     except Exception as err:
         print(f"agent-view: autopreview watcher disabled: {err}", flush=True)
+    threading.Thread(target=remote.run, daemon=True).start()
     print(f"agent-view: http://{args.host}:{args.port}  (transcripts: {PROJECTS})", flush=True)
     try:
         httpd.serve_forever()

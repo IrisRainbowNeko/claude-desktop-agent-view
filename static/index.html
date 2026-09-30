@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent View</title>
+<!--VENDOR-->
 <style>
   :root {
     --bg: #1b1b1a; --panel: #232322; --card: #2a2a28; --line: #3a3a37; --text: #e8e6e1;
@@ -22,10 +23,10 @@
     border-radius: 6px; padding: 3px 8px; cursor: pointer; }
   button:hover { border-color: var(--dim); }
 
-  header { height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  body > header { height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
     border-bottom: 1px solid var(--line); background: var(--panel); }
-  header .brand { font-weight: 600; letter-spacing: .2px; }
-  header .spacer { flex: 1; }
+  body > header .brand { font-weight: 600; letter-spacing: .2px; }
+  body > header .spacer { flex: 1; }
   .pill { font-size: 11px; color: var(--dim); display: inline-flex; align-items: center; gap: 5px; }
   #toggleSessions { display: none; }
 
@@ -43,6 +44,10 @@
   .sess.active { background: var(--card); box-shadow: inset 3px 0 var(--accent); }
   .sess .t { display: flex; gap: 6px; align-items: baseline; }
   .sess .t span.title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .host { flex: none; font-size: 10px; line-height: 15px; padding: 0 5px; border: 1px solid var(--line);
+    border-radius: 4px; color: var(--dim); font-family: var(--mono); }
+  .pill.err { color: var(--err); }
+  header label.follow { font-size: 11px; color: var(--dim); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
   .sess .m { color: var(--faint); font-size: 11px; margin-top: 2px; padding-left: 14px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -114,6 +119,8 @@
   .dot.done { background: var(--done); }
   .dot.stale { background: var(--err); opacity: .6; }
   .dot.idle, .dot.ended { background: var(--faint); }
+  .dot.ok { background: var(--run); }
+  .dot.error { background: var(--err); }
   @keyframes pulse { 50% { opacity: .35; } }
   .st { font-size: 11px; color: var(--dim); white-space: nowrap; }
   .st.running { color: var(--run); } .st.waiting { color: var(--wait); }
@@ -131,6 +138,37 @@
   .msg.thinking .body { color: var(--faint); font-style: italic; max-height: 4.4em; overflow: hidden; cursor: pointer; }
   .msg.thinking.open .body { max-height: none; }
   .msg.system .body { color: var(--faint); text-align: center; font-size: 12px; }
+  /* rendered Markdown / MyST / KaTeX */
+  .msg .body.md { white-space: normal; }
+  .md > :first-child { margin-top: 0; } .md > :last-child { margin-bottom: 0; }
+  .md p, .md ul, .md ol, .md pre, .md table, .md blockquote, .md aside, .md dl { margin: 0 0 .6em; }
+  .md ul, .md ol { padding-left: 1.4em; }
+  .md h1, .md h2, .md h3, .md h4 { margin: .8em 0 .4em; line-height: 1.3; }
+  .md h1 { font-size: 1.3em; } .md h2 { font-size: 1.18em; } .md h3 { font-size: 1.06em; } .md h4 { font-size: 1em; }
+  .md code { font-family: var(--mono); font-size: .92em; background: var(--card); border: 1px solid var(--line);
+    border-radius: 4px; padding: 0 3px; }
+  .md pre { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px;
+    overflow-x: auto; white-space: pre; }
+  .md pre code { background: none; border: 0; padding: 0; }
+  .md a { color: var(--accent); }
+  .md blockquote { border-left: 3px solid var(--line); padding-left: 9px; color: var(--dim); }
+  .md table { border-collapse: collapse; display: block; overflow-x: auto; }
+  .md th, .md td { border: 1px solid var(--line); padding: 3px 8px; }
+  .md hr { border: 0; border-top: 1px solid var(--line); }
+  .md img { max-width: 100%; }
+  .md .katex-display, .md div.math { overflow-x: auto; overflow-y: hidden; }
+  .md div.math { position: relative; }
+  .md .mathlabel { position: absolute; right: 0; top: 0; color: var(--faint); text-decoration: none; font-size: 11px; }
+  .md .myst-target { font-size: 11px; color: var(--faint); } .md .myst-target a { color: inherit; text-decoration: none; }
+  .md aside.admonition { border: 1px solid var(--line); border-left: 3px solid var(--done); border-radius: 6px;
+    padding: 6px 10px; background: var(--card); color: inherit; font-size: inherit; text-align: left; margin: 0 0 .6em; }
+  .md aside.admonition > header { font-weight: 600; margin-bottom: 3px; }
+  .md aside.note, .md aside.info, .md aside.seealso { border-left-color: #5b8fd6; }
+  .md aside.tip, .md aside.hint, .md aside.important { border-left-color: var(--run); }
+  .md aside.warning, .md aside.caution, .md aside.attention { border-left-color: var(--wait); }
+  .md aside.danger, .md aside.error { border-left-color: var(--err); }
+  .md .footnotes { font-size: .92em; color: var(--dim); }
+  .md .math-error { color: var(--err); }
   .tu { font-family: var(--mono); font-size: 12px; border: 1px solid var(--line); border-radius: 6px;
     margin: 6px 0; overflow: hidden; }
   .tu .h { padding: 4px 8px; cursor: pointer; display: flex; gap: 8px; background: var(--card); }
@@ -168,6 +206,9 @@
     body.show-sessions #sessions { transform: none; box-shadow: 4px 0 16px #0006; }
     #detail { position: absolute; inset: 0; z-index: 4; background: var(--bg); border-left: none; }
   }
+  body.embedded #sessions { display: none; }
+  body.embedded .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+  body.embedded .layout.no-detail { grid-template-columns: minmax(0, 1fr); }
 </style>
 </head>
 <body>
@@ -175,6 +216,8 @@
   <button id="toggleSessions" title="会话列表">☰</button>
   <span class="brand">Agent View</span>
   <span class="spacer"></span>
+  <label class="follow" title="在 Claude Desktop 里切到哪个会话（包括 SSH 会话），这里就显示哪个"><input type="checkbox" id="followDesktop"> 跟随 Desktop</label>
+  <span class="pill" id="remoteState"></span>
   <span class="pill" id="hookState"></span>
   <span class="pill" id="connState"><span class="dot"></span>连接中</span>
 </header>
@@ -189,6 +232,7 @@
       <button id="closeDetail" title="关闭">←</button>
       <span class="dot" id="dDot"></span>
       <span class="label" id="dLabel"></span>
+      <label title="用 Markdown / MyST / LaTeX 渲染消息"><input type="checkbox" id="renderMd"> 渲染</label>
       <label><input type="checkbox" id="follow" checked> 跟随</label>
       <button id="loadFull" title="加载完整记录">全部</button>
     </div>
@@ -250,6 +294,8 @@ async function loadSessions() {
   state.clockSkew = d.now - Date.now() / 1000;
   state.sessions = d.sessions;
   state.hooksLast = d.hooks_last;
+  renderRemotes(d.remotes || []);
+  if (d.focused) followFocus(d.focused.sid);
   renderSessions();
   renderHookState();
   if (!state.sid && d.sessions.length) {
@@ -264,12 +310,21 @@ function renderSessions() {
     h("div", { class: "sess" + (s.id === state.sid ? " active" : ""),
                onclick: () => { selectSession(s.id); document.body.classList.remove("show-sessions"); } },
       h("div", { class: "t" }, h("span", { class: "dot " + s.status }),
-        h("span", { class: "title", title: s.title }, s.title)),
+        h("span", { class: "title", title: s.title }, s.title),
+        s.host && h("span", { class: "host", title: "SSH 会话，运行在 " + s.host }, s.host)),
       h("div", { class: "m" },
         [base(s.cwd) || s.project, ago(s.mtime),
          s.subagents ? `${s.subagents} 个子 agent` + (s.running_subagents ? ` · ${s.running_subagents} 运行中` : "") : ""]
           .filter(Boolean).join(" · ")))
   ) : [h("div", { class: "empty" }, "没有会话")]));
+}
+function renderRemotes(remotes) {
+  const bad = remotes.filter((r) => r.error && !r.connected);
+  const el = $("remoteState");
+  el.className = "pill" + (bad.length ? " err" : "");
+  el.replaceChildren(...(remotes.length ? [h("span", { class: "dot " + (bad.length ? "error" : "ok") }),
+    bad.length ? `${bad.map((r) => r.host).join(", ")} 连接失败` : "SSH " + remotes.map((r) => r.host).join(", ")] : []));
+  el.title = remotes.map((r) => `${r.host}: ${r.connected ? "已连接" : r.error || "连接中"} · ${r.sessions} 个会话`).join("\n");
 }
 function renderHookState() {
   const on = state.hooksLast && now() - state.hooksLast < 3600;
@@ -324,7 +379,7 @@ function renderMap() {
   const graph = state.view === "graph";
   $("map").replaceChildren(
     h("h2", { title: s.title }, s.title),
-    h("div", { class: "sub" }, [s.cwd, s.entrypoint, s.started && "开始于 " + ago(s.started)].filter(Boolean).join(" · ")),
+    h("div", { class: "sub" }, [s.host && "ssh " + s.host, s.cwd, s.entrypoint, s.started && "开始于 " + ago(s.started)].filter(Boolean).join(" · ")),
     h("div", { class: "counts" },
       subs.length ? [
         h("span", {}, "子 agent ", h("b", {}, subs.length)),
@@ -456,11 +511,12 @@ function renderTranscript(scrollEnd) {
       return;
     }
     const who = { user: "用户", assistant: "Claude", thinking: "思考", system: "" }[it.role];
+    const html = it.role !== "system" ? markdown(it.text) : null;
     const k = "t" + i;
     out.push(h("div", { class: "msg " + it.role + (state.open.has(k) ? " open" : ""),
                         onclick: it.role === "thinking" ? toggle(k) : null },
       who ? h("div", { class: "who" }, who + (it.ts ? " · " + new Date(it.ts * 1000).toLocaleTimeString() : "")) : null,
-      h("div", { class: "body" }, it.text)));
+      html == null ? h("div", { class: "body" }, it.text) : mdBody(html)));
   };
   runs.forEach((g, gi) => {
     if (!g.tools || g.tools.length < 2) { g.idx.forEach((i) => renderItem(d.items[i], i, out)); return; }
@@ -503,6 +559,7 @@ function connect() {
   es.onmessage = (m) => {
     const e = JSON.parse(m.data);
     if (e.type === "hello") { refreshSessions(); if (state.sid) refreshDetail(); return; }
+    if (e.type === "focus") { followFocus(e.sid); return; }
     const sids = e.type === "changed" ? e.sessions : [e.session];
     if (e.type === "hook") state.hooksLast = now();
     if (sids.includes(state.sid)) {
@@ -512,6 +569,51 @@ function connect() {
     refreshSessions();
   };
 }
+
+// "跟随 Desktop": show whichever session is focused in Claude Desktop. When this page itself
+// has focus, the newly focused session is the one hosting this Browser pane: remember it and
+// stay put, so clicking into the pane never makes it jump to its own session.
+function followFocus(sid) {
+  if (!sid || sid === state.focused) return;
+  state.focused = sid;
+  if (document.hasFocus()) { state.hostSid = sid; return; }
+  if ($("followDesktop").checked && sid !== state.hostSid && sid !== state.sid) selectSession(sid);
+}
+const paneQuery = new URLSearchParams(location.search);
+const embedded = paneQuery.get("embedded") === "1" || paneQuery.has("desktop_session");
+$("followDesktop").checked = !embedded && localStorage.getItem("agentView.follow") === "1";
+if (embedded) {
+  document.body.classList.add("embedded");
+  $("followDesktop").closest("label").style.display = "none";
+  $("toggleSessions").style.display = "none";
+}
+$("followDesktop").onchange = (e) => {
+  localStorage.setItem("agentView.follow", e.target.checked ? "1" : "0");
+  if (e.target.checked) refreshSessions();
+};
+
+// Markdown / MyST / LaTeX rendering (bundle inlined by the server; plain text if it is missing).
+const mdCache = new Map();
+function markdown(text) {
+  if (!text || !$("renderMd").checked || !window.AgentMarkdown) return null;
+  let html = mdCache.get(text);
+  if (html == null) {
+    try { html = AgentMarkdown.render(text); } catch { return null; }
+    if (mdCache.size > 500) mdCache.delete(mdCache.keys().next().value);
+    mdCache.set(text, html);
+  }
+  return html;
+}
+function mdBody(html) {
+  const el = h("div", { class: "body md" });
+  el.innerHTML = html;  // markdown-it runs with html:false, so message text cannot inject markup
+  return el;
+}
+$("renderMd").checked = localStorage.getItem("agentView.md") !== "0";
+$("renderMd").onchange = (e) => {
+  localStorage.setItem("agentView.md", e.target.checked ? "1" : "0");
+  if (state.transcript) renderTranscript(false);
+};
 
 function updateHash() {
   const p = new URLSearchParams();
@@ -533,6 +635,7 @@ setInterval(() => {
 
 (function init() {
   const p = new URLSearchParams(location.hash.slice(1));
+  if (embedded && window.__AGENT_VIEW_DESKTOP_SESSION__) p.set("s", window.__AGENT_VIEW_DESKTOP_SESSION__);
   if (p.get("s")) { state.sid = p.get("s"); state.aid = p.get("a"); }
   loadSessions().catch((e) => $("map").replaceChildren(h("div", { class: "empty" }, "连不上服务：" + e.message)));
   if (state.sid) { loadDetail(); if (state.aid) { showDetail(true); loadTranscript(true); } }

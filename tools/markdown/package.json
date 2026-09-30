@@ -1,0 +1,18 @@
+{
+  "name": "agent-view-markdown",
+  "private": true,
+  "type": "module",
+  "description": "Builds static/vendor/markdown.js (markdown-it + MyST plugins + KaTeX) and static/vendor/katex.css",
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "katex": "^0.18.9",
+    "markdown-it": "^12.3.2",
+    "markdown-it-amsmath": "^0.4.0",
+    "markdown-it-deflist": "^4.0.0",
+    "markdown-it-docutils": "^0.1.6",
+    "markdown-it-dollarmath": "^0.5.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-myst-extras": "^0.3.0",
+    "punycode": "^2.3.1"
+  }
+}

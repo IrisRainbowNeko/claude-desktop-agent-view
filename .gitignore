@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 .claude/*
 !.claude/launch.json
+tools/markdown/node_modules/
