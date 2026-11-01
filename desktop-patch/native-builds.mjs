@@ -47,4 +47,11 @@ export function nativeBuild({ chunk, menu, toggle, panes, csp }) {
 const WINDOWS = nativeBuild({ chunk: ".vite/build/index.chunk-2SHPxESV.js",
   menu: "Fqi=e=>", toggle: "y0", panes: "dv", csp: "LHe(Wl(t),c,l)" });
 WINDOWS.mainHash = "716599ebde5c1e17f303cd0c736c4472b463e58ed127a278853cc2406d2eabb4";
-export const NATIVE_BUILDS = { win32: { "4.4212.0": WINDOWS } };
+const MACOS = nativeBuild({ chunk: ".vite/build/index.chunk-m4oMImJ-.js",
+  menu: "OWi=e=>", toggle: "w0", panes: "Z_", csp: "THe(QBe(t),c,l)" });
+MACOS.mainHash = "926694919e5ff5d05cb804945637ffbe6ae75bdeac5e461f30e7c3d5fa043ccb";
+
+export const NATIVE_BUILDS = {
+  win32: { "4.4212.0": WINDOWS },
+  darwin: { "4.4212.0": MACOS },
+};

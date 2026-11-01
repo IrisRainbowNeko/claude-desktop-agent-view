@@ -8,12 +8,16 @@ from pathlib import Path, PureWindowsPath
 def state_dir():
     if sys.platform == "win32":
         return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "agent-view"
+    if sys.platform == "darwin":
+        return Path(os.environ.get("XDG_STATE_HOME", Path.home() / "Library" / "Logs" / "Agent View"))
     return Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
 
 
 def cache_dir():
     if sys.platform == "win32":
         return state_dir() / "cache"
+    if sys.platform == "darwin":
+        return Path(os.environ.get("XDG_CACHE_HOME", Path.home() / "Library" / "Caches")) / "agent-view"
     return Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "agent-view"
 
 

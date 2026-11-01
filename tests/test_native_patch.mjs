@@ -114,8 +114,10 @@ for (const platform of ["win32", "darwin"]) {
     for (const [name, bytes] of [["main.cjs", readFile(readAsar(p.app), build.chunk)],
       ...Object.keys(build.frontend).map(f => [f + ".mjs", readFile(readAsar(p.ion), "assets/v1/" + f)])]) {
       const file = path.join(root, name); fs.writeFileSync(file, bytes);
-      const result = spawnSync(process.execPath, ["--check", file], { encoding: "utf8" });
-      assert.equal(result.status, 0, result.stderr);
+      const result = spawnSync(process.execPath, ["--check", file], { encoding: "utf8", maxBuffer: 32 << 20 });
+      // A minified bundle's entire source line can otherwise hide the actual
+      // parser error under megabytes of assertion output.
+      assert.equal(result.status, 0, result.error?.message || result.stderr.match(/SyntaxError:[^\n]*/)?.[0] || result.stderr.slice(-1000));
     }
   });
 }

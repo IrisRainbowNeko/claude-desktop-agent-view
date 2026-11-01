@@ -1,7 +1,7 @@
 # Windows
 
 Use Python 3.10+ and Git for Windows. The optional Desktop sidebar patch also
-needs Node.js 22+. Run these commands in PowerShell from this checkout:
+needs Node.js 24+. Run these commands in PowerShell from this checkout:
 
 ```powershell
 python install_hooks.py --dry-run

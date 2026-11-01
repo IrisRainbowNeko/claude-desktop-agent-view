@@ -82,7 +82,8 @@ async function ensureServer({ probe = requestJson, spawnServer = spawn, server =
   await fs.promises.access(server, fs.constants.R_OK);
   const dir = process.platform === "win32"
     ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "agent-view")
-    : path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"));
+    : process.env.XDG_STATE_HOME || (process.platform === "darwin"
+      ? path.join(os.homedir(), "Library", "Logs", "Agent View") : path.join(os.homedir(), ".local", "state"));
   await fs.promises.mkdir(dir, { recursive: true });
   const fd = fs.openSync(path.join(dir, "agent-view-launcher.log"), "a", 0o600);
   try {

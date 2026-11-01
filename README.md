@@ -35,8 +35,8 @@ KaTeX, all MIT). The server inlines it into the page. To rebuild it, run
 
 ## Usage
 
-Windows users: see [the Windows guide](docs/windows.md) for native Python hooks,
-background startup and the optional Desktop SSH sidebar patch.
+See the [Windows guide](docs/windows.md) and [macOS guide](docs/macos.md) for native
+Python hooks, background startup and the optional Desktop SSH sidebar patches.
 
 1. Start the server. Pick one of these:
    - In Desktop, open the Browser pane and choose the `agent-view` config
@@ -107,7 +107,10 @@ patch below.
 
 ## Advanced: Agent View sidebar in Desktop SSH sessions (optional)
 
-`desktop-patch/` patches Claude Desktop on Linux itself. It adds a globe
+`desktop-patch/` patches Claude Desktop itself. The Linux installer is described
+below; native Windows x64 and macOS universal **4.4212.0** use the separate
+[Windows](docs/windows.md) and [macOS](docs/macos.md) application-copy installers.
+The patch adds a globe
 **Agent View** button to the toolbar of SSH sessions, which opens that session's
 dashboard in Desktop's right sidebar. The same toggle is in
 **View > Toggle Agent View Sidebar** (`Ctrl+Alt+G`), and

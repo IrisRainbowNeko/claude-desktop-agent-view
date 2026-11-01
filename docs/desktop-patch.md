@@ -1,7 +1,7 @@
 # Desktop SSH sidebar patch
 
-For the native Windows build (including its signed MSIX layout), use
-[the Windows guide](windows.md). The Linux installer below targets the Linux
+For native Windows and macOS builds, use [the Windows guide](windows.md) or
+[the macOS guide](macos.md). The Linux installer below targets the Linux
 repackaging; `native.mjs` handles native double-ASAR bundles separately.
 
 `desktop-patch/` adds an **Agent View** button to SSH sessions in Claude Desktop on
