@@ -39,6 +39,7 @@ for depth in range(8):
 server.CATALOG = SimpleNamespace(snapshot=lambda: {"rows": ROWS, "indexing": False,
     "indexed": len(ROWS), "expected": len(ROWS), "index_error": None})
 server.FOCUS = SimpleNamespace(current=None)
+server.desktop_transcript_id = lambda _: ROWS[0]["id"]
 server.api_session = lambda q: {"session": next((r for r in ROWS if r["id"] == q.get("id", [""])[0]), ROWS[0]),
                                 "nodes": NODES, "hooks_last": 0, "now": NOW}
 server.api_transcript = lambda q: {"items": [{"role": "assistant", "text": "记录：" + q.get("agent", ["main"])[0], "ts": 1}],

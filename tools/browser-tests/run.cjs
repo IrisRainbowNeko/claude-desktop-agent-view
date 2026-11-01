@@ -103,8 +103,10 @@ async function until(check, label) {
 
     await page.locator("#currentSession").click();
     await until(async () => await page.locator("#sessionQuery").inputValue() === "", "return to current session");
-    await until(async () => await page.locator("[data-session='session-0999']").count() === 1, "current session on second session page");
-    assert.equal(await page.locator("#projectsPage").innerText(), "2 / 2");
+    await until(async () => (await page.locator("#projectsPage").innerText()) === "2 / 2"
+      && (await page.locator(".project-sessions .sidebar-pages span").innerText()) === "2 / 2"
+      && await page.locator("[data-session='session-0999']").count() === 1,
+    "current session on second project and session pages");
     await page.locator("#graphView").click();
     await page.locator("#agentsNext").click();
     await page.reload();
@@ -117,7 +119,8 @@ async function until(check, label) {
     const narrow = await browser.newContext({ viewport: { width: 360, height: 740 } });
     const pane = await narrow.newPage();
     pane.on("pageerror", error => errors.push(error.message));
-    await pane.goto(url + "/?embedded=1");
+    const paneResponse = await pane.goto(url + "/?desktop_session=fixture");
+    assert.match(paneResponse.headers()["content-security-policy"], /default-src 'none'/);
     await until(async () => await pane.locator("#mapNodes [data-node]").count() === 20, "narrow isolated pane");
     assert.equal(await pane.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await pane.locator("#parentRecord").click();
