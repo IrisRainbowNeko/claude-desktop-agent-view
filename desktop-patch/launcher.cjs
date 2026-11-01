@@ -80,12 +80,15 @@ async function ensureServer({ probe = requestJson, spawnServer = spawn, server =
   };
   if (await up()) return;
   await fs.promises.access(server, fs.constants.R_OK);
-  const dir = path.join(os.homedir(), ".local", "state");
+  const dir = process.platform === "win32"
+    ? path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"), "agent-view")
+    : process.env.XDG_STATE_HOME || (process.platform === "darwin"
+      ? path.join(os.homedir(), "Library", "Logs", "Agent View") : path.join(os.homedir(), ".local", "state"));
   await fs.promises.mkdir(dir, { recursive: true });
   const fd = fs.openSync(path.join(dir, "agent-view-launcher.log"), "a", 0o600);
   try {
-    const child = spawnServer(process.env.AGENT_VIEW_PYTHON || "python3", [server, "--host", "127.0.0.1", "--port", "7777"], {
-      cwd: path.dirname(server), detached: true, stdio: ["ignore", fd, fd],
+    const child = spawnServer(process.env.AGENT_VIEW_PYTHON || (process.platform === "win32" ? "python" : "python3"), [server, "--host", "127.0.0.1", "--port", "7777"], {
+      cwd: path.dirname(server), detached: true, windowsHide: true, stdio: ["ignore", fd, fd],
     });
     await new Promise((resolve, reject) => {
       child.once("error", reject);
@@ -98,7 +101,7 @@ async function ensureServer({ probe = requestJson, spawnServer = spawn, server =
     await wait(200);
     if (await up()) return;
   }
-  throw new Error("Agent View did not start; see ~/.local/state/agent-view-launcher.log");
+  throw new Error(`Agent View did not start; see ${path.join(dir, "agent-view-launcher.log")}`);
 }
 
 function createLauncher({ electron, toggleSidebar, logger,

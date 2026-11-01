@@ -27,7 +27,16 @@ OTHER_EVENTS = ["SessionStart", "SessionEnd", "UserPromptSubmit", "Notification"
 
 def ours(hook):
     cmd = str(hook.get("command", "")) if isinstance(hook, dict) else ""
-    return str(HOOK) in cmd or str(AUTOPREVIEW) in cmd
+    args = hook.get("args", []) if isinstance(hook, dict) else []
+    return any(str(p) in cmd or str(p).replace("\\", "/") in cmd or str(p) in args
+               for p in (HOOK, AUTOPREVIEW))
+
+
+def command(script):
+    if sys.platform == "win32":
+        # Exec-form hooks bypass Bash/PowerShell quoting and PATH lookup altogether.
+        return {"command": sys.executable, "args": [str(script)]}
+    return {"command": f"{shlex.quote(sys.executable)} {shlex.quote(str(script))}"}
 
 
 def strip(settings):
@@ -51,15 +60,13 @@ def strip(settings):
 def install(settings):
     strip(settings)
     hooks = settings.setdefault("hooks", {})
-    cmd = f"{shlex.quote(sys.executable)} {shlex.quote(str(HOOK))}"
-    entry = {"type": "command", "command": cmd, "async": True, "timeout": 5}
+    entry = {"type": "command", **command(HOOK), "async": True, "timeout": 5}
     for event in TOOL_EVENTS:
         hooks.setdefault(event, []).append({"matcher": "*", "hooks": [dict(entry)]})
     for event in OTHER_EVENTS:
         hooks.setdefault(event, []).append({"hooks": [dict(entry)]})
     # Synchronous: in "auto" mode its stdout (the "open the preview" instruction) must reach the context.
-    auto = f"{shlex.quote(sys.executable)} {shlex.quote(str(AUTOPREVIEW))}"
-    hooks["SessionStart"].append({"hooks": [{"type": "command", "command": auto, "timeout": 10}]})
+    hooks["SessionStart"].append({"hooks": [{"type": "command", **command(AUTOPREVIEW), "timeout": 10}]})
 
 
 def main():
@@ -72,7 +79,7 @@ def main():
     settings = {}
     if args.settings.exists():
         try:
-            settings = json.loads(args.settings.read_text() or "{}")
+            settings = json.loads(args.settings.read_text(encoding="utf-8-sig") or "{}")
         except ValueError as err:
             sys.exit(f"{args.settings} is not valid JSON ({err}); fix it first.")
 
@@ -82,11 +89,11 @@ def main():
         print(text)
         return
     if args.settings.exists():
-        backup = args.settings.with_name(f"settings.json.bak-{time.strftime('%Y%m%d-%H%M%S')}")
+        backup = args.settings.with_name(f"settings.json.bak-{time.strftime('%Y%m%d-%H%M%S')}-{time.time_ns()}")
         shutil.copy2(args.settings, backup)
         print(f"backup: {backup}")
     args.settings.parent.mkdir(parents=True, exist_ok=True)
-    args.settings.write_text(text)
+    args.settings.write_text(text, encoding="utf-8")
     print(("removed Agent View hooks from " if args.uninstall else "installed Agent View hooks in ")
           + str(args.settings))
     if not args.uninstall:

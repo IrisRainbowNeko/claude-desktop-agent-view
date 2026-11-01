@@ -1,0 +1,6 @@
+{
+  "name": "agent-view-browser-tests",
+  "private": true,
+  "scripts": { "test": "node run.cjs" },
+  "devDependencies": { "playwright": "1.58.2" }
+}

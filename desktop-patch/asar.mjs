@@ -18,6 +18,12 @@ export function readAsar(buf) {
   return { header, data: buf.subarray(8 + size) };
 }
 
+// Electron's embedded integrity checks hash the JSON header, not the entire ASAR.
+export function headerHash(buf) {
+  readAsar(buf); // reject invalid archives before inspecting their header
+  return sha256(buf.subarray(16, 16 + buf.readUInt32LE(12)));
+}
+
 function entry(header, name, create = false) {
   let node = header;
   const parts = name.split("/");

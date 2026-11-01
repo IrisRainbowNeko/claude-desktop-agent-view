@@ -5,11 +5,22 @@ the Claude Desktop Code tab's Browser pane, and it also works in any browser.
 
 ![Graph view of a session with three levels of subagents](docs/graph-view.png)
 
-- **Agent map**: shows the main session and its subagents as a tree, based on
-  who spawned which subagent. Switch between an indented list and a
-  left-to-right graph with the 列表 / 图 toggle (remembered per browser). Each card shows status (running / waiting /
-  done / stale), the tool currently running, elapsed time, tool call count,
-  output tokens, context length and error count.
+- **Projects and history**: sessions group automatically by host and full working
+  directory, with optional project pins. Search covers the entire indexed history,
+  including sessions beyond the latest 40. Projects and sessions have separate
+  20-item pages. The 当前 control locates the selected session outside the current
+  search or page. History metadata is indexed incrementally in the background;
+  progress appears in the sidebar while old transcripts are being scanned.
+- **Agent map**: the main session, status summary, focused parent and breadcrumbs
+  stay visible. 大纲 and 聚焦图 display one hierarchy level at a time, with at most
+  **20 direct children per page**, including when every child is running. Enter a
+  branch or use the breadcrumbs to navigate. Large sessions initially show
+  需要关注 and aggregate ended branches; status buttons reveal other tasks.
+  Search covers all depths of the selected session; 定位到层级 opens a result's
+  actual parent and page. Live updates preserve sibling order, page and reading
+  position. View, filter and parent pages are remembered per session and browser.
+  The same controls work on Windows, macOS and Linux, in both browser windows
+  and narrow Desktop sidebars.
 - **Transcript**: click a card to see that agent's messages, thinking and tool
   calls with their results. The transcript follows new output live.
 - **Rendering**: messages and thinking are rendered as Markdown with LaTeX math
@@ -34,6 +45,9 @@ KaTeX, all MIT). The server inlines it into the page. To rebuild it, run
 | hooks → `hook.py` → `POST /event` | precise state: waiting for permission, turn finished, subagent stopped | No, but recommended |
 
 ## Usage
+
+See the [Windows guide](docs/windows.md) and [macOS guide](docs/macos.md) for native
+Python hooks, background startup and the optional Desktop SSH sidebar patches.
 
 1. Start the server. Pick one of these:
    - In Desktop, open the Browser pane and choose the `agent-view` config
@@ -104,7 +118,10 @@ patch below.
 
 ## Advanced: Agent View sidebar in Desktop SSH sessions (optional)
 
-`desktop-patch/` patches Claude Desktop on Linux itself. It adds a globe
+`desktop-patch/` patches Claude Desktop itself. The Linux installer is described
+below; native Windows x64 and macOS universal **4.4212.0** use the separate
+[Windows](docs/windows.md) and [macOS](docs/macos.md) application-copy installers.
+The patch adds a globe
 **Agent View** button to the toolbar of SSH sessions, which opens that session's
 dashboard in Desktop's right sidebar. The same toggle is in
 **View > Toggle Agent View Sidebar** (`Ctrl+Alt+G`), and
@@ -166,6 +183,9 @@ content. Environment variables: `AGENT_VIEW_PORT`, `AGENT_VIEW_HOST`,
   (all) to load everything.
 - Tests: `python3 -m unittest discover -s tests` and
   `node --test tests/*.cjs tests/*.mjs`.
+  Browser integration tests use synthetic history (1,000 sessions, 250 direct
+  children and an eight-level branch): run `npm ci`,
+  `npx playwright install chromium` and `npm test` in `tools/browser-tests/`.
 
 ## License
 

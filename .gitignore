@@ -3,3 +3,4 @@ __pycache__/
 .claude/*
 !.claude/launch.json
 tools/markdown/node_modules/
+tools/browser-tests/node_modules/

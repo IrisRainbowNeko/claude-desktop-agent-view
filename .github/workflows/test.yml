@@ -1,0 +1,54 @@
+name: Test
+on: [push, pull_request]
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python -m unittest discover -s tests
+      - run: node --test tests/*.cjs tests/*.mjs
+      - name: Verify reviewed macOS application installer and restore
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          curl --fail --location --silent --show-error \
+            'https://downloads.claude.ai/releases/darwin/universal/4.4212.0/Claude-cbfe3c56d49c49332ad5a9588303c9dbc70a5e7f.zip' \
+            --output "$RUNNER_TEMP/Claude.zip"
+          echo "e1e144e20d98e793135f584eba92e3d8fa30a8151f6df40bf10846ae407de5fb  $RUNNER_TEMP/Claude.zip" | shasum -a 256 --check
+          ditto -x -k "$RUNNER_TEMP/Claude.zip" "$RUNNER_TEMP/vendor"
+          export AGENT_VIEW_MACOS_RESOURCES="$RUNNER_TEMP/vendor/Claude.app/Contents/Resources"
+          node --test tests/test_native_patch.mjs
+          python desktop-patch/install-macos.py install \
+            --source "$RUNNER_TEMP/vendor/Claude.app" \
+            --destination "$RUNNER_TEMP/Claude Agent View.app"
+          python desktop-patch/install-macos.py status --destination "$RUNNER_TEMP/Claude Agent View.app"
+          python desktop-patch/install-macos.py restore --destination "$RUNNER_TEMP/Claude Agent View.app"
+          cmp "$RUNNER_TEMP/vendor/Claude.app/Contents/Resources/app.asar" "$RUNNER_TEMP/Claude Agent View.app/Contents/Resources/app.asar"
+          cmp "$RUNNER_TEMP/vendor/Claude.app/Contents/Resources/ion-dist.asar" "$RUNNER_TEMP/Claude Agent View.app/Contents/Resources/ion-dist.asar"
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tools/browser-tests/package-lock.json
+      - run: npm ci
+        working-directory: tools/browser-tests
+      - run: npx playwright install --with-deps chromium
+        working-directory: tools/browser-tests
+      - run: npm test
+        working-directory: tools/browser-tests

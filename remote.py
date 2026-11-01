@@ -15,14 +15,15 @@ forwarded, so remote status is inferred from transcripts only.
 import base64
 import json
 import os
+import re
 import subprocess
 import threading
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-MIRROR = Path(os.environ.get("AGENT_VIEW_REMOTE_CACHE",
-                             Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
-                             / "agent-view" / "remote"))
+from platform_support import background_options, cache_dir
+
+MIRROR = Path(os.environ.get("AGENT_VIEW_REMOTE_CACHE", cache_dir() / "remote"))
 HORIZON = 86400          # mirror sessions active in the last day
 RESCAN = 5               # s between reads of Desktop's session records
 MAX_CHUNK = 4 << 20      # bytes per file per remote poll
@@ -77,14 +78,14 @@ def ssh_sessions(now):
             try:
                 if now - f.stat().st_mtime > HORIZON:
                     continue
-                d = json.loads(f.read_text())
+                d = json.loads(f.read_text(encoding="utf-8-sig"))
             except (OSError, ValueError):
                 continue
             host = (d.get("sshConfig") or {}).get("sshHost")
             path = d.get("sshRemoteTranscriptPath")
             last = max(d.get("lastActivityAt") or 0, d.get("createdAt") or 0) / 1000
             if host and path and path.endswith(".jsonl") and not d.get("isArchived") \
-                    and now - last < HORIZON and "/" not in host:
+                    and now - last < HORIZON and re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.@-]*", host):
                 out.setdefault(host, []).append(path)
     return out
 
@@ -105,10 +106,13 @@ class HostSync:
 
     def local(self, remote_file):
         """Mirror path: keep the path below the remote projects/<project>/ directory."""
-        parts = Path(remote_file).parts
+        parts = PurePosixPath(remote_file).parts
         i = len(parts) - 1 - parts[::-1].index("projects") if "projects" in parts else len(parts) - 2
-        rel = Path(*parts[i + 1:])
-        if ".." in rel.parts or rel.is_absolute():
+        relative = parts[i + 1:]
+        if ".." in relative or any("\\" in p or ":" in p for p in relative):
+            raise ValueError(remote_file)
+        rel = Path(*relative)
+        if rel.is_absolute():
             raise ValueError(remote_file)
         return self.root / rel
 
@@ -157,7 +161,7 @@ class HostSync:
             started = time.time()
             try:
                 proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE, start_new_session=True)
+                                        stderr=subprocess.PIPE, **background_options(detached=True))
             except OSError as err:
                 self.error = f"ssh: {err}"
                 time.sleep(60)

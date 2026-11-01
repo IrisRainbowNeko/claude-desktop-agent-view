@@ -88,9 +88,10 @@ test("a missing server starts locally, without a remote command", async () => {
       return child;
     },
   });
-  assert.equal(call[0], "python3");
+  assert.equal(call[0], process.env.AGENT_VIEW_PYTHON || (process.platform === "win32" ? "python" : "python3"));
   assert.deepEqual(call[1], [__filename, "--host", "127.0.0.1", "--port", "7777"]);
   assert.equal(detached, true);
+  assert.equal(call[2].windowsHide, true);
 });
 
 test("multiple menu rebuilds register only one terminal listener", () => {

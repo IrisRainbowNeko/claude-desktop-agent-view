@@ -26,6 +26,8 @@ import sys
 import time
 from pathlib import Path
 
+from platform_support import background_options, is_worktree
+
 NAME = "agent-view"
 PREVIEW = Path(__file__).resolve().parent / "preview.py"
 CONTEXT = (
@@ -37,7 +39,8 @@ CONTEXT = (
 
 
 def git(cwd, *args):
-    return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True, timeout=3)
+    return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True,
+                          encoding="utf-8", timeout=3, **background_options())
 
 
 def exclude_from_git(path):
@@ -50,7 +53,7 @@ def exclude_from_git(path):
         info = path.parent / info
     rel = "/" + path.relative_to(Path(top.stdout.strip()).resolve()).as_posix()
     info.parent.mkdir(parents=True, exist_ok=True)
-    with open(info, "a") as f:
+    with open(info, "a", encoding="utf-8") as f:
         f.write(f"\n# added by Agent View autopreview\n{rel}\n")
 
 
@@ -61,7 +64,7 @@ def ensure_config(cwd):
              "port": 7778, "autoPort": True}
     if path.exists():
         try:
-            data = json.loads(path.read_text() or "{}")
+            data = json.loads(path.read_text(encoding="utf-8-sig") or "{}")
             configs = data.setdefault("configurations", [])
         except (ValueError, AttributeError):
             return False  # comments / odd content: leave the user's file alone
@@ -70,10 +73,10 @@ def ensure_config(cwd):
         if git(cwd, "ls-files", "--error-unmatch", str(path)).returncode == 0:
             return False  # committed file: don't create a surprise diff
         configs.append(entry)
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return True
     path.parent.mkdir(exist_ok=True)
-    path.write_text(json.dumps({"version": "0.0.1", "configurations": [entry]}, indent=2) + "\n")
+    path.write_text(json.dumps({"version": "0.0.1", "configurations": [entry]}, indent=2) + "\n", encoding="utf-8")
     try:
         exclude_from_git(path)
     except Exception:
@@ -87,7 +90,7 @@ def known_projects():
     dirs = set()
     for proj in root.iterdir() if root.is_dir() else []:
         for f in sorted(proj.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)[:3]:
-            with open(f, errors="replace") as fh:
+            with open(f, encoding="utf-8", errors="replace") as fh:
                 for _, line in zip(range(50), fh):
                     if '"cwd"' in line:
                         try:
@@ -97,7 +100,7 @@ def known_projects():
                             pass
     home = Path.home().resolve()
     return sorted(p for p in map(Path, dirs)
-                  if p.is_dir() and p.resolve() != home and "/.claude/worktrees/" not in str(p))
+                  if p.is_dir() and p.resolve() != home and not is_worktree(p))
 
 
 def backfill(dry_run):
@@ -136,12 +139,12 @@ def watch_desktop(interval=3.0):
                 try:
                     if f.stat().st_mtime < since:
                         continue
-                    d = json.loads(f.read_text())
+                    d = json.loads(f.read_text(encoding="utf-8-sig"))
                     cwd = Path(d.get("cwd") or "")
                     if d.get("isArchived") or d.get("sshConfig") or not cwd.is_absolute() or cwd in done:
                         continue
                     done.add(cwd)
-                    if cwd.is_dir() and cwd.resolve() != home and "/.claude/worktrees/" not in str(cwd):
+                    if cwd.is_dir() and cwd.resolve() != home and not is_worktree(cwd):
                         ensure_config(cwd)
                 except Exception:
                     pass

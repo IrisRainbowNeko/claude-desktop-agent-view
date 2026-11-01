@@ -34,6 +34,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import remote
+from session_catalog import SessionCatalog
 
 HERE = Path(__file__).resolve().parent
 CLAUDE_DIR = Path(os.environ.get("CLAUDE_CONFIG_DIR", Path.home() / ".claude"))
@@ -302,7 +303,7 @@ def subagent_files(session_path):
 
 def read_meta(agent_path):
     try:
-        return json.loads(agent_path.with_suffix(".meta.json").read_text())
+        return json.loads(agent_path.with_suffix(".meta.json").read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):
         return {}
 
@@ -425,17 +426,59 @@ def session_summary(path, now):
     }
 
 
+CATALOG = SessionCatalog(main_session_files, subagent_files, host_of, LIVE)
+
+
 def api_sessions(q):
-    limit = int(q.get("limit", ["40"])[0])
-    now = time.time()
-    out = []
-    for _, p in main_session_files()[:limit]:
+    def number(name, default, maximum=None):
         try:
-            out.append(session_summary(p, now))
-        except OSError:
-            pass
-    return {"sessions": out, "hooks_last": LIVE.last_event, "now": now, "remotes": remote.status(),
-            "focused": FOCUS.current}
+            value = int(q.get(name, [str(default)])[0])
+        except (ValueError, TypeError):
+            raise ValueError(f"invalid {name}") from None
+        if value < (1 if name == "limit" else 0):
+            raise ValueError(f"invalid {name}")
+        return min(value, maximum) if maximum else value
+
+    limit, offset = number("limit", 40, 100), number("offset", 0)
+    snapshot = CATALOG.snapshot()
+    rows = sorted(snapshot["rows"], key=lambda r: (-r["mtime"], r["id"]))
+    current = next((r for r in rows if r["id"] == q.get("current", [None])[0]), None)
+    search = q.get("q", [""])[0].strip().casefold()
+    if search:
+        rows = [r for r in rows if search in " ".join(
+            str(r.get(k) or "") for k in ("title", "cwd", "project", "host", "id")).casefold()]
+    if q.get("active") == ["1"]:
+        rows = [r for r in rows if r["status"] in ("running", "waiting") or r["running_subagents"]]
+    if q.get("project"):
+        rows = [r for r in rows if r["project_id"] == q["project"][0]]
+    common = {"hooks_last": LIVE.last_event, "now": time.time(), "remotes": remote.status(),
+              "focused": FOCUS.current, "indexing": snapshot["indexing"],
+              "indexed": snapshot["indexed"], "index_expected": snapshot["expected"],
+              "index_error": snapshot["index_error"], "current": current}
+    if q.get("view") == ["projects"]:
+        grouped = {}
+        for row in rows:
+            project = grouped.setdefault(row["project_id"], {
+                "id": row["project_id"], "cwd": row["cwd"], "host": row["host"],
+                "label": re.split(r"[\\/]", (row["cwd"] or "").rstrip("/\\"))[-1] or row["project"],
+                "sessions": 0, "active_sessions": 0, "mtime": row["mtime"]})
+            project["sessions"] += 1
+            project["active_sessions"] += row["status"] in ("running", "waiting") or bool(row["running_subagents"])
+        pinned = set(q.get("pinned", [""])[0].split(","))
+        projects = sorted(grouped.values(), key=lambda p: (p["id"] not in pinned, -p["mtime"], p["id"]))
+        current_index = next((i for i, p in enumerate(projects) if current and p["id"] == current["project_id"]), None)
+        if q.get("locate") == ["1"] and current_index is not None:
+            offset = current_index // limit * limit
+        result = {"projects": projects[offset:offset + limit], "sessions": [], "total": len(projects),
+                  "session_total": len(rows), "current_matches": any(r["id"] == current["id"] for r in rows) if current else False,
+                  "current_offset": current_index // limit * limit if current_index is not None else None}
+    else:
+        current_index = next((i for i, row in enumerate(rows) if current and row["id"] == current["id"]), None)
+        if q.get("locate") == ["1"] and current_index is not None:
+            offset = current_index // limit * limit
+        result = {"sessions": rows[offset:offset + limit], "total": len(rows)}
+    return {**common, **result, "offset": offset, "limit": limit,
+            "next_offset": offset + limit if offset + limit < result["total"] else None}
 
 
 def api_session(q):
@@ -570,7 +613,7 @@ class DesktopFocus:
             try:
                 m = f.stat().st_mtime
                 if self.records.get(f, (None,))[0] != m:
-                    d = json.loads(f.read_text())
+                    d = json.loads(f.read_text(encoding="utf-8-sig"))
                     self.records[f] = (m, d.get("cliSessionId"), d.get("lastFocusedAt") or 0)
             except (OSError, ValueError):
                 pass
@@ -594,7 +637,7 @@ def desktop_transcript_id(session_id, roots=None):
     for root in roots:
         for record in root.glob(f"*/*/{session_id}.json"):
             try:
-                sid = json.loads(record.read_text()).get("cliSessionId")
+                sid = json.loads(record.read_text(encoding="utf-8-sig")).get("cliSessionId")
                 if isinstance(sid, str) and re.fullmatch(uuid, sid):
                     ids.add(sid)
             except (OSError, ValueError):
@@ -611,14 +654,16 @@ def index_html():
     Inlined rather than served as separate files so the page stays a single document:
     it works behind proxies that only pass "/" and the API (e.g. the Desktop SSH pane).
     """
-    files = [HERE / "static" / n for n in ("index.html", "vendor/katex.css", "vendor/markdown.js")]
+    files = [HERE / "static" / n for n in ("index.html", "vendor/katex.css", "vendor/markdown.js", "navigation.js")]
     key = tuple(f.stat().st_mtime if f.exists() else 0 for f in files)
     if _index_cache.get("key") != key:
         page = files[0].read_bytes()
-        if all(key[1:]):
+        if all(key[1:3]):
             vendor = (b"<style>" + files[1].read_bytes() + b"</style>\n<script>"
                       + files[2].read_bytes().replace(b"</script", b"<\\/script") + b"</script>")
             page = page.replace(b"<!--VENDOR-->", vendor, 1)
+        navigation = b"<script>" + files[3].read_bytes().replace(b"</script", b"<\\/script") + b"</script>"
+        page = page.replace(b"<!--NAVIGATION-->", navigation, 1)
         _index_cache.update(key=key, body=page)
     return _index_cache["body"]
 
@@ -722,6 +767,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "not found"}, 404)
         except (BrokenPipeError, ConnectionResetError):
             pass
+        except ValueError as err:
+            self._json({"error": str(err)}, 400)
 
     def do_POST(self):
         if urlparse(self.path).path != "/event":
