@@ -114,8 +114,8 @@ normal Browser pane entry.
 
 This is unofficial and unsupported. Desktop has no extension API, so the patch
 edits Desktop's minified code in `app.asar` and three renderer files. It only
-works on Desktop builds whose anchors were reviewed; currently that is
-**2.7032.0**. On any other version, or if an anchor does not match exactly once,
+works on Desktop builds whose anchors were reviewed; currently these are
+**2.7032.0, 2.31226.1 and 2.42304.0**. On any other version, or if an anchor does not match exactly once,
 or if a frontend file's hash differs, it refuses and changes nothing.
 
 ```bash
@@ -143,6 +143,11 @@ Details:
   `install` again after each Desktop upgrade.
 - Supporting a new Desktop version means finding the same anchors in its
   bundles and adding an entry to `BUILDS` in `desktop-patch/patch.mjs`.
+
+[docs/desktop-patch.md](docs/desktop-patch.md) has the full guide. It explains
+what each part of the patch does and how to check it after installing. It also
+covers troubleshooting, how updates are handled, and step by step how to find
+the anchors in a new Desktop version.
 
 ## Configuration
 

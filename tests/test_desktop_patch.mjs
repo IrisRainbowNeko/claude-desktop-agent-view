@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { readAsar, writeAsar, readFile, sha256 } from "../desktop-patch/asar.mjs";
-import { install, restore, afterUpdate, status, launcherSource } from "../desktop-patch/patch.mjs";
+import { install, restore, afterUpdate, status, launcherSource, BUILDS as REVIEWED } from "../desktop-patch/patch.mjs";
 
 const LAUNCHER = 'const path = require("node:path");\nconst SERVER = process.env.AGENT_VIEW_SERVER || path.join(__dirname, "..", "server.py");\n';
 const FRONT = "export const pane=a=>a.local;";
@@ -101,4 +101,19 @@ test("after an update to a reviewed build, the patch is applied again", () => {
 
 test("the repo launcher has the line the installer rewrites", () => {
   assert.match(launcherSource("/srv/x/server.py"), /AGENT_VIEW_SERVER \|\| "\/srv\/x\/server.py";/);
+});
+
+test("every reviewed build has the three main edits and three renderer files", () => {
+  for (const [version, build] of Object.entries(REVIEWED)) {
+    assert.match(build.chunk, /^\.vite\/build\/index\.chunk-[\w-]+\.js$/, version);
+    assert.equal(build.main.length, 3, version);
+    for (const [before, after] of build.main) assert.ok(after.includes("agent") && before !== after, version);
+    const files = Object.entries(build.frontend);
+    assert.equal(files.length, 3, version);
+    for (const [file, [hash, changes]] of files) {
+      assert.match(file, /^[\w-]+\.js$/, version);
+      assert.match(hash, /^[0-9a-f]{64}$/, version);
+      assert.ok(changes.length > 0 && changes.every(([a, b]) => a && b.includes("agentView")), `${version} ${file}`);
+    }
+  }
 });

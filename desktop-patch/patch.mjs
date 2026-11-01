@@ -23,34 +23,47 @@ const FRONTEND = "ion-dist/assets/v1";
 const HOOK = "/etc/pacman.d/hooks/agent-view-desktop.hook";
 const SERVER_LINE = 'const SERVER = process.env.AGENT_VIEW_SERVER || path.join(__dirname, "..", "server.py");';
 
-// Reviewed builds. main: [old, new] replacements in the main-process chunk inside app.asar.
+// Reviewed builds. The edits are the same in every version, only the minified names differ.
+// main: [old, new] replacements in the main-process chunk inside app.asar.
 // frontend: renderer files next to app.asar, with the sha256 of the unmodified file.
-const IFRAME = 'g("iframe",{key:C.id,title:"Agent View",src:"app://agent-view/?desktop_session="+encodeURIComponent(C.id),sandbox:"allow-scripts allow-same-origin",referrerPolicy:"no-referrer",style:{width:"100%",height:"100%",minHeight:0,flex:1,border:0,background:"#fff"}})';
+// To support a new version, find each anchor in its bundles (see docs/desktop-patch.md).
+const VIEW_MENU = '({label:X().formatMessage({defaultMessage:"View",id:"LCWUQ/4Fu6"}),submenu:[';
+const PROTOCOL = 'let t=new URL(e.url);if(t.hostname!=="localhost")return new Response(null,{status:404});let i=e.headers.get("Origin")';
+
+// menu: the View menu builder ("YHr=()=>"); toggle/panes: the functions that toggle the
+// session pane and the pane enum; csp: the expression building the app page's CSP.
+function mainChanges({ menu, toggle, panes, csp }) {
+  return [
+    // View menu: "Toggle Agent View Sidebar" (Ctrl+Alt+G), opening the session's side pane.
+    [menu + VIEW_MENU, menu + VIEW_MENU + `require("./agentViewLauncher.js").menuItem({electron:a,toggleSidebar:event=>${toggle}(event,dispatcher=>dispatcher.dispatchToggleSessionPane(${panes}.Preview)),logger:P}),{type:"separator"},`],
+    // Allow the app://agent-view frame in the app page's CSP.
+    [`csp:${csp}`, `csp:${csp}.replace(/frame-src([^;]*)/,directive=>directive+" app://agent-view")`],
+    // Serve app://agent-view/ as a read-only proxy to the local Agent View server.
+    [PROTOCOL, 'let t=new URL(e.url);if(t.hostname==="agent-view")return require("./agentViewLauncher.js").proxyRequest(e,a);' + PROTOCOL.slice("let t=new URL(e.url);".length)],
+  ];
+}
+
+// In SSH sessions the Preview pane holds the Agent View frame for that session. `session` is
+// the pane's session variable, `h` the JSX factory, `pane` the pane component and its props.
+function paneChange(session, h, pane) {
+  const before = `if(e==="preview")return ${session}?.type==="remote"?`;
+  const frame = `${h}("iframe",{key:${session}.id,title:"Agent View",src:"app://agent-view/?desktop_session="+encodeURIComponent(${session}.id),sandbox:"allow-scripts allow-same-origin",referrerPolicy:"no-referrer",style:{width:"100%",height:"100%",minHeight:0,flex:1,border:0,background:"#fff"}})`;
+  return [before, `if(e==="preview"&&${session}?.type==="local"&&agentViewSsh)return ${h}(${pane},title:"Agent View",children:${frame}});${before}`];
+}
+
 export const BUILDS = {
   "2.7032.0": {
     chunk: ".vite/build/index.chunk-CxyX_nIQ.js",
-    main: [
-      // View menu: "Toggle Agent View Sidebar" (Ctrl+Alt+G), opening the session's side pane.
-      ['YHr=()=>({label:X().formatMessage({defaultMessage:"View",id:"LCWUQ/4Fu6"}),submenu:[',
-        'YHr=()=>({label:X().formatMessage({defaultMessage:"View",id:"LCWUQ/4Fu6"}),submenu:[require("./agentViewLauncher.js").menuItem({electron:a,toggleSidebar:event=>TQ(event,dispatcher=>dispatcher.dispatchToggleSessionPane(qv.Preview)),logger:P}),{type:"separator"},'],
-      // Allow the app://agent-view frame in the app page's CSP.
-      ["csp:Y4t(iu(t),c,l)",
-        'csp:Y4t(iu(t),c,l).replace(/frame-src([^;]*)/,directive=>directive+" app://agent-view")'],
-      // Serve app://agent-view/ as a read-only proxy to the local Agent View server.
-      ['let t=new URL(e.url);if(t.hostname!=="localhost")return new Response(null,{status:404});let i=e.headers.get("Origin")',
-        'let t=new URL(e.url);if(t.hostname==="agent-view")return require("./agentViewLauncher.js").proxyRequest(e,a);if(t.hostname!=="localhost")return new Response(null,{status:404});let i=e.headers.get("Origin")'],
-    ],
+    main: mainChanges({ menu: "YHr=()=>", toggle: "TQ", panes: "qv", csp: "Y4t(iu(t),c,l)" }),
     frontend: {
-      // Session pane: show the Preview pane in SSH sessions.
+      // Session pane: allow the Preview pane in SSH sessions.
       "c11959232-5NqmfTEB.js": ["20538c99cb343ef07d569bcd5b0b6c02baef57255c624d39fa5af02a9977e880", [
         ["te=ia(u),ne=la(n)", "te=ia(u),agentViewSsh=Xi(u),ne=la(n)"],
         ["M=te||!!g||", 'M=te||u?.type==="local"&&agentViewSsh||!!g||'],
       ]],
-      // In SSH sessions the Preview pane holds the Agent View frame for that session.
       "cccc2cf0a-DjnwAvES.js": ["2cdd905412b485ec85cde156f924647aab4370e48af8eead80440951d21ca103", [
         ["C=Ta(u),w=Po(e)", "C=Ta(u),agentViewSsh=pa(C),w=Po(e)"],
-        ['if(e==="preview")return C?.type==="remote"?',
-          `if(e==="preview"&&C?.type==="local"&&agentViewSsh)return g(Wo,{style:{height:"100%"},leadingClearance:d,center:m,tileId:t,onClose:ue,hideCloseButton:y,onEscapeClose:b?void 0:fe,title:"Agent View",children:${IFRAME}});if(e==="preview")return C?.type==="remote"?`],
+        paneChange("C", "g", 'Wo,{style:{height:"100%"},leadingClearance:d,center:m,tileId:t,onClose:ue,hideCloseButton:y,onEscapeClose:b?void 0:fe'),
       ]],
       // Toolbar: the globe "Agent View" button in SSH sessions.
       "cc70f2bdf-B2j9Ioay.js": ["0f68ab60d25e1ff6fbe64521b0157a72ba1081dcb31426baf42b0aba7820130e", [
@@ -60,6 +73,50 @@ export const BUILDS = {
         ['icon:e==="preview"&&b?"Globe":Mi[e]', 'icon:e==="preview"&&(b||agentViewSsh)?"Globe":Mi[e]'],
         ['r=t("preview",!!x,b?n.formatMessage', 'r=t("preview",!!x,agentViewSsh?"Agent View":b?n.formatMessage'],
         ["[e,i,n,l,u,x,_,y,m,b,S,C,d,j,M,h]", "[e,i,n,l,u,x,_,y,m,b,S,C,d,j,M,h,agentViewSsh]"],
+      ]],
+    },
+  },
+  "2.31226.1": {
+    chunk: ".vite/build/index.chunk-BsJ4Sf2W.js",
+    main: mainChanges({ menu: "Zbi=()=>", toggle: "r$", panes: "Jg", csp: "xun(Ul(t),c,l)" }),
+    frontend: {
+      "c11959232-CDBo_AYC.js": ["bf5d1058293a7a83a8853831a9a8be1e6adba88805f4cb1099225ca89c36113b", [
+        ["ee=za(c),O=ro(t)", "ee=za(c),agentViewSsh=qa(c),O=ro(t)"],
+        ["j=ee||!!m||", 'j=ee||c?.type==="local"&&agentViewSsh||!!m||'],
+      ]],
+      "cccc2cf0a-DHtZKTKW.js": ["0f13bcdc39572e06d535ff0234b319ad15f63d92445a570c656c56bc8b1a41cb", [
+        ["E=Ss(u),D=", "E=Ss(u),agentViewSsh=vs(E),D="],
+        paneChange("E", "v", 'Lm,{style:{height:"100%"},leadingClearance:f,center:p,tileId:t,onClose:_e,hideCloseButton:h,onEscapeClose:g?void 0:be'),
+      ]],
+      "ca80fca8d-uAxy5Mjj.js": ["61c76a540331b8cac4946a37cb8ab3ade4ef471e96d8b0829e7901949c931414", [
+        ["function u4({owner:e,via:t})", 'import{V as agentViewIsSsh}from"./c5da7eb42-BqFpOdHJ.js";function u4({owner:e,via:t})'],
+        ["m=zp(r,s4),h=gm(e,s4)", 'm=zp(r,s4),agentViewSshHook=agentViewIsSsh(r),agentViewSsh=r?.type==="local"&&agentViewSshHook,h=gm(e,s4)'],
+        ["y=m||!!o||", "y=m||agentViewSsh||!!o||"],
+        ['icon:e==="preview"&&_?"Globe":Ag[e]', 'icon:e==="preview"&&(_||agentViewSsh)?"Globe":Ag[e]'],
+        ['r=t("preview",!!y,_?n.formatMessage', 'r=t("preview",!!y,agentViewSsh?"Agent View":_?n.formatMessage'],
+        ["[e,i,n,l,u,y,h,g,p,_,b,x,d,j,N,P]", "[e,i,n,l,u,y,h,g,p,_,b,x,d,j,N,P,agentViewSsh]"],
+      ]],
+    },
+  },
+  "2.42304.0": {
+    chunk: ".vite/build/index.chunk-Z7WxBjyE.js",
+    main: mainChanges({ menu: "QNi=e=>", toggle: "AQ", panes: "k_", csp: "Dmn(Yl(t),c,l)" }),
+    frontend: {
+      "c11959232-Dx4NfIyJ.js": ["ae0db7e8daafb631da8155ce106127ade06a3c461c383f473dafcd4532cd63cd", [
+        ["te=ao(s),O=jo(n)", "te=ao(s),agentViewSsh=io(s),O=jo(n)"],
+        ["j=te||A&&ie||", 'j=te||s?.type==="local"&&agentViewSsh||A&&ie||'],
+      ]],
+      "cccc2cf0a-B0D--VZp.js": ["4f75e5db4ff595b4fc4f22a9092dfa245b4af29f964bb207276b868a606964cb", [
+        ["N=sl(u),P=", "N=sl(u),agentViewSsh=Fc(N),P="],
+        paneChange("N", "g", 'Ig,{style:{height:"100%"},leadingClearance:f,center:p,tileId:t,onClose:Te,hideCloseButton:_,onEscapeClose:v?void 0:Ae'),
+      ]],
+      "c73f45bc3-CFrHin0p.js": ["c328ce5a89455c1901061fa581e32f471507a474b2d0880d4dc3a626048253c9", [
+        ["function Rh({owner:e,via:t})", 'import{H as agentViewIsSsh}from"./c5da7eb42-B8cTG8SI.js";function Rh({owner:e,via:t})'],
+        ["h=ga(r,Fh),g=qs(r,Fh)", 'h=ga(r,Fh),agentViewSshHook=agentViewIsSsh(r),agentViewSsh=r?.type==="local"&&agentViewSshHook,g=qs(r,Fh)'],
+        ["k=h||T&&O||", "k=h||agentViewSsh||T&&O||"],
+        ['icon:e==="preview"&&C?"Globe":Io[e]', 'icon:e==="preview"&&(C||agentViewSsh)?"Globe":Io[e]'],
+        ['r=t("preview",!!k,C?n.formatMessage', 'r=t("preview",!!k,agentViewSsh?"Agent View":C?n.formatMessage'],
+        ["[e,i,n,l,d,k,b,x,S,m,C,A,j,f,V,ee,te]", "[e,i,n,l,d,k,b,x,S,m,C,A,j,f,V,ee,te,agentViewSsh]"],
       ]],
     },
   },
