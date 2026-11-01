@@ -34,3 +34,21 @@ jobs:
           python desktop-patch/install-macos.py restore --destination "$RUNNER_TEMP/Claude Agent View.app"
           cmp "$RUNNER_TEMP/vendor/Claude.app/Contents/Resources/app.asar" "$RUNNER_TEMP/Claude Agent View.app/Contents/Resources/app.asar"
           cmp "$RUNNER_TEMP/vendor/Claude.app/Contents/Resources/ion-dist.asar" "$RUNNER_TEMP/Claude Agent View.app/Contents/Resources/ion-dist.asar"
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tools/browser-tests/package-lock.json
+      - run: npm ci
+        working-directory: tools/browser-tests
+      - run: npx playwright install --with-deps chromium
+        working-directory: tools/browser-tests
+      - run: npm test
+        working-directory: tools/browser-tests

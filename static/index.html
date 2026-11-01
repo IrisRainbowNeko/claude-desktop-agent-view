@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Agent View</title>
 <!--VENDOR-->
+<!--NAVIGATION-->
 <style>
   :root {
     --bg: #1b1b1a; --panel: #232322; --card: #2a2a28; --line: #3a3a37; --text: #e8e6e1;
@@ -209,6 +210,85 @@
   body.embedded #sessions { display: none; }
   body.embedded .layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
   body.embedded .layout.no-detail { grid-template-columns: minmax(0, 1fr); }
+
+  /* The header, focused parent and page controls never scroll with the children. */
+  .layout > * { min-width: 0; min-height: 0; }
+  #sessions { display: flex; flex-direction: column; overflow: hidden; }
+  #sessions .filter { display: block; position: static; flex: none; }
+  .filter input[type=search], .map-search { width: 100%; min-width: 0; font: inherit;
+    color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; }
+  .filter .filter-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 7px; }
+  #sessList { overflow: auto; flex: 1; }
+  .sidebar-pages, .pagebar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    padding: 7px 10px; border-top: 1px solid var(--line); font-size: 12px; flex: none; }
+  button:disabled { opacity: .45; cursor: default; }
+  #currentSession { display: block; width: 100%; text-align: left; margin-top: 7px; overflow-wrap: anywhere; }
+  .project { border-bottom: 1px solid var(--line); }
+  .project-heading { display: flex; align-items: center; gap: 4px; padding: 7px 8px; }
+  .project-open { flex: 1; min-width: 0; text-align: left; border: none; }
+  .project-open .title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project-open small { display: block; color: var(--dim); font-size: 11px; font-weight: normal; }
+  .project-pin { border: none; flex: none; }
+  .project-pin.on { color: var(--accent); }
+  .project-sessions { border-top: 1px solid var(--line); }
+  button.sess { display: block; width: 100%; border: none; border-radius: 0; text-align: left; }
+  #catalogState { color: var(--dim); padding: 7px 10px; font-size: 11px; flex: none; overflow-wrap: anywhere; }
+  #map { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+  .map-header { padding: 12px 14px 8px; border-bottom: 1px solid var(--line); flex: none; }
+  #map .sub { margin-bottom: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #map .counts { gap: 5px; margin: 7px 0; }
+  .counts button { font-size: 12px; }
+  .counts button.on { border-color: var(--accent); background: var(--card); }
+  .map-controls { display: flex; gap: 8px; align-items: center; }
+  .map-search { flex: 1; }
+  .map-controls .viewsw { flex: none; }
+  .branch-nav { padding: 7px 14px; border-bottom: 1px solid var(--line); flex: none; }
+  #breadcrumbs { display: flex; gap: 5px; align-items: center; overflow-x: auto; white-space: nowrap; font-size: 11px; }
+  #breadcrumbs button { border: none; padding: 2px 3px; flex: none; max-width: 180px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .parent-line { display: flex; gap: 7px; align-items: center; margin-top: 5px; }
+  #parentLabel { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #parentStats { color: var(--dim); font-size: 11px; margin-top: 3px; }
+  #selectionHint { color: var(--dim); font-size: 11px; margin-top: 5px; }
+  #selectionHint button { padding: 1px 5px; }
+  .pagebar { border-top: none; border-bottom: 1px solid var(--line); padding: 6px 14px; }
+  #pageSummary { flex: 1; color: var(--dim); }
+  #pageJump { width: 52px; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 4px; padding: 3px; }
+  #mapViewport { overflow: auto; min-height: 0; flex: 1; padding: 8px 14px 24px; }
+  #mapNodes { display: flex; flex-direction: column; gap: 6px; }
+  #mapNodes.focus-graph { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+    align-content: start; border-top: 1px solid var(--line); padding-top: 10px; }
+  .agent-row { background: var(--card); border: 1px solid var(--line); border-radius: 6px; min-width: 0; overflow: hidden; }
+  .agent-row.selected { border-color: var(--accent); }
+  .agent-select { display: block; width: 100%; padding: 7px 9px; border: none; border-radius: 0; text-align: left; }
+  .agent-top { display: flex; gap: 7px; align-items: center; }
+  .agent-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .agent-meta, .agent-path { margin-top: 3px; color: var(--dim); font-size: 11px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .agent-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 0 9px 6px; font-size: 11px; }
+  .agent-actions .branch-counts { flex: 1; color: var(--dim); }
+  .agent-actions button { font-size: 11px; padding: 2px 6px; }
+  #finishedSummary { border-top: 1px solid var(--line); padding: 6px 14px; color: var(--dim); font-size: 11px; flex: none; }
+  #finishedSummary button { font-size: 11px; }
+  #mapNodes .empty { grid-column: 1 / -1; }
+  [hidden] { display: none !important; }
+  @media (max-width: 900px) {
+    body.embedded .layout, body.embedded .layout.no-detail { grid-template-columns: minmax(0, 1fr); }
+    .map-header { padding: 9px 10px 6px; }
+    .branch-nav, .pagebar, #finishedSummary { padding-left: 10px; padding-right: 10px; }
+    #mapViewport { padding-left: 10px; padding-right: 10px; }
+    #detail .dh { flex-wrap: wrap; }
+  }
+  @media (max-width: 420px) {
+    body > header { gap: 6px; padding: 0 8px; }
+    #hookState { display: none; }
+    .map-controls { flex-wrap: wrap; }
+    .map-search { flex-basis: 100%; }
+    .counts button { padding: 3px 5px; }
+    .parent-line { flex-wrap: wrap; }
+    #parentLabel { min-width: 100px; }
+  }
 </style>
 </head>
 <body>
@@ -223,10 +303,30 @@
 </header>
 <div class="layout no-detail" id="layout">
   <aside id="sessions">
-    <div class="filter"><label><input type="checkbox" id="onlyActive"> 只看活跃</label></div>
+    <div class="filter">
+      <input type="search" id="sessionQuery" placeholder="搜索全部项目和会话" aria-label="搜索全部项目和会话">
+      <div class="filter-row"><label><input type="checkbox" id="onlyActive"> 只看活跃</label><span id="projectCount"></span></div>
+      <button id="currentSession" hidden></button>
+    </div>
     <div id="sessList"></div>
+    <div class="sidebar-pages"><button id="projectsPrev" aria-label="上一页项目">上一页</button><span id="projectsPage"></span><button id="projectsNext" aria-label="下一页项目">下一页</button></div>
+    <div id="catalogState" role="status"></div>
   </aside>
-  <section id="map"><div class="empty">加载中…</div></section>
+  <section id="map" aria-label="Agent 分层浏览">
+    <div class="map-header">
+      <h2 id="mapTitle">加载中…</h2><div class="sub" id="mapMeta"></div>
+      <div class="counts" id="mapCounts" aria-label="Agent 状态筛选"></div>
+      <div class="map-controls"><input type="search" id="agentQuery" class="map-search" placeholder="搜索整场会话的 agent、工具或 ID" aria-label="搜索整场会话的 agent">
+        <span class="viewsw"><button id="listView">大纲</button><button id="graphView">聚焦图</button></span></div>
+    </div>
+    <div class="branch-nav"><nav id="breadcrumbs" aria-label="当前分支路径"></nav>
+      <div class="parent-line"><span class="dot" id="parentDot"></span><span id="parentLabel">主会话</span><button id="parentRecord">查看记录</button><button id="backToMain">回到主会话</button></div>
+      <div id="parentStats"></div><div id="selectionHint" hidden></div></div>
+    <div class="pagebar"><span id="pageSummary" aria-live="polite"></span><button id="agentsPrev" aria-label="上一页子节点">上一页</button>
+      <label>第 <input id="pageJump" type="number" min="1" value="1" aria-label="跳转到子节点页码"> 页</label><button id="agentsNext" aria-label="下一页子节点">下一页</button></div>
+    <div id="mapViewport"><div id="mapNodes"><div class="empty">正在读取会话…</div></div></div>
+    <div id="finishedSummary" hidden></div>
+  </section>
   <section id="detail">
     <div class="dh">
       <button id="closeDetail" title="关闭">←</button>
@@ -242,10 +342,22 @@
 <script>
 "use strict";
 const STATUS = { running: "运行中", waiting: "等待确认", idle: "空闲", done: "已完成",
-                 stale: "无响应", ended: "已结束" };
+                 stale: "无更新", ended: "已结束" };
 const $ = (id) => document.getElementById(id);
+const Nav = AgentNavigation;
+function readSetting(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+}
+function writeSetting(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* a private browser may disallow storage */ }
+}
 const state = { sessions: [], sid: null, detail: null, aid: null, transcript: null,
-                full: false, open: new Set(), view: localStorage.getItem("agentView.view") || "list", groups: new Map(), hooksLast: 0, clockSkew: 0 };
+                full: false, open: new Set(), groups: new Map(), hooksLast: 0, clockSkew: 0,
+                projects: [], projectOffset: 0, projectOpen: undefined, projectSessions: null, catalog: null,
+                projectPins: new Set([].concat(readSetting("agentView.projectPins", [])).filter(id => typeof id === "string").slice(-50)),
+                sidebarRequest: 0, projectRequest: 0, detailRequest: 0, sidebarKey: "",
+                index: null, nav: null, navSaved: readSetting("agentView.navigation", {}), catalogTimer: null };
+if (!state.navSaved || typeof state.navSaved !== "object" || Array.isArray(state.navSaved)) state.navSaved = {};
 
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
@@ -276,7 +388,7 @@ function ago(t) {
 }
 const ktok = (n) => !n ? "0" : n < 1000 ? String(n) : n < 1e6 ? (n / 1000).toFixed(1) + "k" : (n / 1e6).toFixed(2) + "M";
 const active = (st) => st === "running" || st === "waiting";
-const base = (p) => (p || "").split("/").filter(Boolean).pop() || p || "";
+const base = Nav.basename;
 
 async function getJSON(url) {
   const r = await fetch(url, { cache: "no-store" });
@@ -285,38 +397,159 @@ async function getJSON(url) {
 }
 function debounce(fn, ms) {
   let t = null;
-  return () => { clearTimeout(t); t = setTimeout(fn, ms); };
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+// Reuse keyed elements and patch their text/attributes in place. Event handlers
+// capture stable IDs, never snapshot offsets or node objects.
+function patchElement(old, next) {
+  if (old.nodeType !== next.nodeType || old.nodeName !== next.nodeName) { old.replaceWith(next); return; }
+  if (old.nodeType === Node.TEXT_NODE) { if (old.data !== next.data) old.data = next.data; return; }
+  if (old.getAttribute("data-session") !== next.getAttribute("data-session") ||
+      old.getAttribute("data-control") !== next.getAttribute("data-control")) { old.replaceWith(next); return; }
+  for (const attr of [...old.attributes]) if (!next.hasAttribute(attr.name)) old.removeAttribute(attr.name);
+  for (const attr of next.attributes) if (old.getAttribute(attr.name) !== attr.value) old.setAttribute(attr.name, attr.value);
+  const children = [...next.childNodes];
+  for (let i = 0; i < children.length; i++) {
+    if (old.childNodes[i]) patchElement(old.childNodes[i], children[i]);
+    else old.append(children[i]);
+  }
+  while (old.childNodes.length > children.length) old.lastChild.remove();
+}
+function keyedList(container, entries, keyOf, render, viewport = container) {
+  const top = viewport.getBoundingClientRect().top;
+  const anchor = [...container.children].find(el => el.getBoundingClientRect().bottom > top);
+  const anchorKey = anchor?.dataset.key, offset = anchor ? anchor.getBoundingClientRect().top - top : 0;
+  const scroll = viewport.scrollTop;
+  const old = new Map([...container.children].map(el => [el.dataset.key, el]));
+  const keys = new Set();
+  entries.forEach((item, i) => {
+    const key = String(keyOf(item)); keys.add(key);
+    const next = render(item); next.dataset.key = key;
+    let el = old.get(key);
+    if (el) patchElement(el, next); else el = next;
+    if (container.children[i] !== el) container.insertBefore(el, container.children[i] || null);
+  });
+  for (const [key, el] of old) if (!keys.has(key)) el.remove();
+  const kept = [...container.children].find(el => el.dataset.key === anchorKey);
+  viewport.scrollTop = kept ? scroll + kept.getBoundingClientRect().top - top - offset : scroll;
+}
+
+function pager(meta, previous, next, label) {
+  previous.disabled = !meta || meta.offset === 0;
+  next.disabled = !meta || meta.next_offset == null;
+  label.textContent = meta ? `${Math.floor(meta.offset / meta.limit) + 1} / ${Math.max(1, Math.ceil(meta.total / meta.limit))}` : "";
 }
 
 // ------------------------------------------------------------------ sessions
-async function loadSessions() {
-  const d = await getJSON("/api/sessions");
+function sessionQuery(extra = {}) {
+  const q = new URLSearchParams({ limit: "20", q: $("sessionQuery").value.trim(),
+    active: $("onlyActive").checked ? "1" : "0", current: state.sid || "", ...extra });
+  return "/api/sessions?" + q;
+}
+function stableItems(old, fresh) {
+  const byId = new Map(fresh.map(item => [item.id, item]));
+  const result = old.filter(item => byId.has(item.id)).map(item => byId.get(item.id));
+  const seen = new Set(result.map(item => item.id));
+  return result.concat(fresh.filter(item => !seen.has(item.id)));
+}
+async function loadSessions(locate = false) {
+  const request = ++state.sidebarRequest;
+  const key = JSON.stringify([$("sessionQuery").value.trim(), $("onlyActive").checked,
+    state.projectOffset, [...state.projectPins]]);
+  const d = await getJSON(sessionQuery({ view: "projects", offset: String(state.projectOffset),
+    pinned: [...state.projectPins].join(","), locate: locate ? "1" : "0" }));
+  if (request !== state.sidebarRequest) return;
   state.clockSkew = d.now - Date.now() / 1000;
-  state.sessions = d.sessions;
+  state.projects = state.sidebarKey === key && !locate ? stableItems(state.projects, d.projects || []) : d.projects || [];
+  state.sidebarKey = key;
+  state.projectOffset = d.offset;
+  state.catalog = d;
   state.hooksLast = d.hooks_last;
+  if (locate && d.current) state.projectOpen = d.current.project_id;
+  if (state.projectOpen === undefined || (state.projectOpen !== null && !state.projects.some(p => p.id === state.projectOpen)))
+    state.projectOpen = state.projects[0]?.id || null;
   renderRemotes(d.remotes || []);
-  if (d.focused) followFocus(d.focused.sid);
-  renderSessions();
   renderHookState();
-  if (!state.sid && d.sessions.length) {
-    const pick = d.sessions.find((s) => active(s.status)) || d.sessions[0];
-    selectSession(pick.id);
+  renderSessions();
+  if (state.projectOpen) await loadProject(state.projectOpen, undefined, locate);
+  if (request !== state.sidebarRequest) return;
+  if (d.focused) followFocus(d.focused.sid);
+  clearTimeout(state.catalogTimer);
+  state.catalogTimer = setTimeout(() => loadSessions().catch(showCatalogError), d.indexing ? 750 : 5000);
+}
+function showCatalogError(error) {
+  $("catalogState").textContent = "读取项目失败：" + error.message;
+}
+async function loadProject(id, offset, locate = false) {
+  const request = ++state.projectRequest;
+  const key = JSON.stringify([id, $("sessionQuery").value.trim(), $("onlyActive").checked]);
+  const old = state.projectSessions;
+  if (offset == null) offset = old?.key === key ? old.offset : 0;
+  const d = await getJSON(sessionQuery({ project: id, offset: String(offset), locate: locate ? "1" : "0" }));
+  if (request !== state.projectRequest || state.projectOpen !== id) return;
+  d.sessions = old?.key === key && old.offset === offset ? stableItems(old.sessions, d.sessions) : d.sessions;
+  state.projectSessions = { ...d, key, project: id };
+  state.sessions = d.sessions;
+  renderSessions();
+  if (!state.sid && d.sessions.length) selectSession((d.sessions.find(s => active(s.status)) || d.sessions[0]).id);
+}
+function chooseProject(id) {
+  state.projectOpen = state.projectOpen === id ? null : id;
+  state.projectRequest++;
+  renderSessions();
+  if (state.projectOpen) loadProject(id).catch(showCatalogError);
+}
+function togglePin(id) {
+  state.projectPins.has(id) ? state.projectPins.delete(id) : state.projectPins.add(id);
+  writeSetting("agentView.projectPins", [...state.projectPins].slice(-50));
+  state.projectOffset = 0; state.sidebarKey = "";
+  loadSessions().catch(showCatalogError);
+}
+function renderProject(project) {
+  const id = project.id, open = state.projectOpen === id, pinned = state.projectPins.has(id);
+  const details = [project.host && "ssh " + project.host, project.cwd].filter(Boolean).join(" · ");
+  const out = h("section", { class: "project" },
+    h("div", { class: "project-heading" },
+      h("button", { class: "project-open", title: details, "aria-expanded": String(open), onclick: () => chooseProject(id) },
+        h("span", { class: "title" }, (open ? "▾ " : "▸ ") + project.label,
+          project.host ? " · " + project.host : ""),
+        h("small", {}, `${project.sessions} 个会话 · ${project.active_sessions} 活跃`)),
+      h("button", { class: "project-pin" + (pinned ? " on" : ""), "aria-label": (pinned ? "取消置顶 " : "置顶 ") + project.label,
+        "aria-pressed": String(pinned), onclick: () => togglePin(id) }, pinned ? "★" : "☆")));
+  if (!open) return out;
+  const d = state.projectSessions?.project === id ? state.projectSessions : null;
+  const content = h("div", { class: "project-sessions" });
+  if (!d) content.append(h("div", { class: "note" }, "加载会话…"));
+  else {
+    for (const s of d.sessions) content.append(h("button", { class: "sess" + (s.id === state.sid ? " active" : ""),
+      "data-session": s.id, onclick: () => { selectSession(s.id); document.body.classList.remove("show-sessions"); } },
+      h("div", { class: "t" }, h("span", { class: "dot " + s.status }), h("span", { class: "title", title: s.title }, s.title)),
+      h("div", { class: "m" }, [ago(s.mtime), s.subagents ? `${s.subagents} 个子 agent` : "主会话",
+        s.running_subagents ? `${s.running_subagents} 活跃` : ""].filter(Boolean).join(" · "))));
+    if (!d.sessions.length) content.append(h("div", { class: "note" }, d.indexing ? "正在索引…" : "没有匹配会话"));
+    content.append(h("div", { class: "sidebar-pages" },
+      h("button", { disabled: d.offset === 0, "aria-label": "上一页会话", onclick: () => loadProject(id, Math.max(0, state.projectSessions.offset - 20)).catch(showCatalogError) }, "上一页"),
+      h("span", {}, `${Math.floor(d.offset / d.limit) + 1} / ${Math.max(1, Math.ceil(d.total / d.limit))}`),
+      h("button", { disabled: d.next_offset == null, "aria-label": "下一页会话", onclick: () => loadProject(id, state.projectSessions.next_offset).catch(showCatalogError) }, "下一页")));
   }
+  out.append(content);
+  return out;
 }
 function renderSessions() {
-  const only = $("onlyActive").checked;
-  const list = state.sessions.filter((s) => !only || active(s.status) || s.running_subagents);
-  $("sessList").replaceChildren(...(list.length ? list.map((s) =>
-    h("div", { class: "sess" + (s.id === state.sid ? " active" : ""),
-               onclick: () => { selectSession(s.id); document.body.classList.remove("show-sessions"); } },
-      h("div", { class: "t" }, h("span", { class: "dot " + s.status }),
-        h("span", { class: "title", title: s.title }, s.title),
-        s.host && h("span", { class: "host", title: "SSH 会话，运行在 " + s.host }, s.host)),
-      h("div", { class: "m" },
-        [base(s.cwd) || s.project, ago(s.mtime),
-         s.subagents ? `${s.subagents} 个子 agent` + (s.running_subagents ? ` · ${s.running_subagents} 运行中` : "") : ""]
-          .filter(Boolean).join(" · ")))
-  ) : [h("div", { class: "empty" }, "没有会话")]));
+  const d = state.catalog;
+  if (!d) return;
+  keyedList($("sessList"), state.projects, p => p.id, renderProject);
+  if (!state.projects.length) $("sessList").replaceChildren(h("div", { class: "empty" },
+    d.indexing ? "正在索引历史项目…" : "没有匹配项目，试试清除搜索或关闭活跃筛选"));
+  $("projectCount").textContent = `${d.total} 个项目`;
+  pager(d, $("projectsPrev"), $("projectsNext"), $("projectsPage"));
+  $("catalogState").textContent = d.index_error ? "索引暂不可用：" + d.index_error : d.indexing
+    ? `正在索引全部历史：${d.indexed} / ${d.index_expected || "…"} 个会话` : `已索引 ${d.indexed} 个会话 · 自动按主机和目录分组`;
+  const current = d.current || (state.detail?.session?.id === state.sid ? state.detail.session : null);
+  $("currentSession").hidden = !state.sid;
+  $("currentSession").textContent = "当前：" + (current?.title || state.sid || "") +
+    (d.current && !d.current_matches ? "（不在当前筛选中，点击定位）" : " · 定位");
 }
 function renderRemotes(remotes) {
   const bad = remotes.filter((r) => r.error && !r.connected);
@@ -335,111 +568,200 @@ function renderHookState() {
 }
 
 // ------------------------------------------------------------------ agent map
+const FILTERS = [["all", "全部"], ["attention", "需要关注"], ["running", "运行中"],
+  ["waiting", "待确认"], ["stale", "无更新"], ["finished", "已结束"]];
+
+function rememberNavigation() {
+  if (!state.nav || !state.sid) return;
+  const ui = state.nav;
+  state.navSaved[state.sid] = { focus: ui.focus, filter: ui.filter, view: ui.view,
+    page: ui.query ? 0 : ui.page, pages: Object.fromEntries(Object.entries(ui.pages).slice(-50)) };
+  const entries = Object.entries(state.navSaved).filter(([id]) => id !== state.sid).slice(-19);
+  writeSetting("agentView.navigation", Object.fromEntries([...entries, [state.sid, state.navSaved[state.sid]]]));
+}
+function navigationFor(sid, nodes) {
+  const saved = state.navSaved[sid] || {};
+  return { focus: typeof saved.focus === "string" ? saved.focus : "main",
+    filter: FILTERS.some(([key]) => key === saved.filter) ? saved.filter : nodes.length > 21 ? "attention" : "all",
+    view: saved.view === "graph" ? "graph" : saved.view === "list" ? "list" :
+      localStorage.getItem("agentView.view") === "graph" ? "graph" : "list",
+    query: "", page: Number.isInteger(saved.page) ? saved.page : 0,
+    pages: saved.pages && typeof saved.pages === "object" ? saved.pages : {}, highlight: null };
+}
 function selectSession(sid) {
-  if (sid !== state.sid) { state.aid = null; state.transcript = null; state.full = false; }
+  if (sid !== state.sid) {
+    rememberNavigation();
+    state.aid = null; state.transcript = null; state.full = false; state.open.clear(); state.groups.clear();
+    state.detail = null; state.index = null; state.nav = null;
+    $("agentQuery").value = "";
+    $("mapNodes").replaceChildren(h("div", { class: "empty" }, "正在读取会话…"));
+    $("mapViewport").scrollTop = 0;
+    $("mapTitle").textContent = "加载会话…";
+  }
   state.sid = sid;
   updateHash();
   renderSessions();
   loadDetail();
   showDetail(!!state.aid);
+  loadSessions().catch(showCatalogError);
 }
 async function loadDetail() {
   if (!state.sid) return;
-  const sid = state.sid;
+  const sid = state.sid, request = ++state.detailRequest;
   try {
     const d = await getJSON("/api/session?id=" + encodeURIComponent(sid));
-    if (sid !== state.sid) return;
+    if (sid !== state.sid || request !== state.detailRequest) return;
+    const first = !state.index;
     state.detail = d;
+    state.index = Nav.buildIndex(d.nodes, state.index);
+    if (!state.nav) state.nav = navigationFor(sid, d.nodes);
+    if (first) {
+      $("agentQuery").value = state.nav.query;
+      if (state.aid && state.index.nodes.has(state.aid)) {
+        const location = Nav.locate(state.index, state.aid);
+        Object.assign(state.nav, location);
+      }
+    }
     renderMap();
   } catch (e) {
-    $("map").replaceChildren(h("div", { class: "empty" }, "读取会话失败：" + e.message));
+    if (sid === state.sid && request === state.detailRequest)
+      $("mapNodes").replaceChildren(h("div", { class: "empty" }, "读取会话失败：" + e.message));
   }
 }
+function descendantStats(id) {
+  const result = { ...state.index.stats.get(id) }, status = state.index.nodes.get(id).status;
+  result.total--;
+  if (["running", "waiting", "stale"].includes(status)) result[status]--;
+  if (Nav.attention(status)) result.attention--;
+  if (Nav.finished(status)) result.finished--;
+  return result;
+}
+function pageKey() { return state.nav.focus + "|" + state.nav.filter; }
+function setAgentPage(page) {
+  if (!state.nav) return;
+  state.nav.page = page;
+  if (!state.nav.query) state.nav.pages[pageKey()] = page;
+  state.nav.highlight = null;
+  renderMap();
+  $("mapViewport").scrollTop = 0;
+  rememberNavigation();
+}
+function focusNode(id) {
+  if (!state.index?.nodes.has(id)) return;
+  state.nav.focus = id; state.nav.query = ""; state.nav.highlight = null;
+  $("agentQuery").value = "";
+  state.nav.page = state.nav.pages[pageKey()] || 0;
+  renderMap();
+  $("mapViewport").scrollTop = 0;
+  rememberNavigation();
+}
+function filterNodes(filter) {
+  if (!state.nav) return;
+  state.nav.filter = filter;
+  state.nav.page = 0;
+  renderMap();
+  $("mapViewport").scrollTop = 0;
+  rememberNavigation();
+}
+function locateAgent(id) {
+  const location = state.index && Nav.locate(state.index, id);
+  if (!location) return;
+  Object.assign(state.nav, location, { query: "", highlight: id });
+  $("agentQuery").value = "";
+  renderMap();
+  const row = [...$("mapNodes").children].find(el => el.dataset.node === id);
+  row?.scrollIntoView({ block: "nearest" });
+  row?.querySelector("button")?.focus({ preventScroll: true });
+  rememberNavigation();
+}
+function renderAgent(n) {
+  const id = n.id, index = state.index, ui = state.nav;
+  const stats = descendantStats(id), children = index.children.get(id)?.length || 0;
+  const elapsed = n.started ? (active(n.status) ? now() : n.last || n.mtime) - n.started : null;
+  const meta = [n.agent_type, n.background && "后台", n.tool?.name,
+    n.tool?.brief, n.errors && `历史工具报错 ${n.errors} 次`].filter(Boolean).join(" · ");
+  const row = h("article", { class: "agent-row" + (id === state.aid || id === ui.highlight ? " selected" : ""), "data-node": id },
+    h("button", { class: "agent-select", "data-control": "record", "aria-pressed": String(id === state.aid),
+      onclick: () => selectAgent(id) },
+      h("div", { class: "agent-top" }, h("span", { class: "dot " + n.status }),
+        h("span", { class: "agent-label", title: n.label }, n.label || id),
+        h("span", { class: "st " + n.status, title: n.status === "stale" ? "一段时间没有新记录，状态可能来自推断" : STATUS[n.status] }, STATUS[n.status] || n.status),
+        h("span", elapsed != null && active(n.status) ? { class: "st", "data-since": n.started, "data-prefix": "" } : { class: "st" }, elapsed != null ? dur(elapsed) : "")),
+      h("div", { class: "agent-meta", title: [meta, `输出 ${ktok(n.out_tokens)} · ctx ${ktok(n.context_tokens)}`].join("\n") }, meta || id),
+      ui.query ? h("div", { class: "agent-path", title: Nav.pathTo(index, id).join(" / ") },
+        Nav.pathTo(index, id).slice(0, -1).map(key => key === "main" ? "主会话" : index.nodes.get(key).label).join(" › ")) : null));
+  if (children || ui.query) row.append(h("div", { class: "agent-actions" },
+    h("span", { class: "branch-counts" }, children
+      ? `${children} 个直接子节点 · ${stats.running} 运行 · ${stats.waiting} 等待 · ${stats.stale} 无更新 · ${stats.finished} 已结束` : "直接子节点 0"),
+    children ? h("button", { "data-control": "branch", onclick: () => focusNode(id) }, `进入分支 (${children})`) : null,
+    ui.query ? h("button", { "data-control": "locate", onclick: () => locateAgent(id) }, "定位到层级") : null));
+  return row;
+}
 function renderMap() {
-  const d = state.detail;
-  if (!d) return;
-  const byParent = {};
-  for (const n of d.nodes) (byParent[n.parent || ""] ||= []).push(n);
-  for (const k in byParent) byParent[k].sort((a, b) => (a.started || 0) - (b.started || 0));
-  const subs = d.nodes.filter((n) => n.id !== "main");
-  const c = (st) => subs.filter((n) => n.status === st).length;
+  const d = state.detail, index = state.index, ui = state.nav;
+  if (!d || !index || !ui) return;
+  const page = Nav.page(index, ui);
+  ui.focus = page.focus; ui.page = page.page;
+  const parent = index.nodes.get(ui.focus), stats = descendantStats(ui.focus);
+  const totals = descendantStats("main"), direct = index.children.get(ui.focus) || [];
+  $("mapTitle").textContent = d.session.title;
+  $("mapTitle").title = d.session.title;
+  $("mapMeta").textContent = [d.session.host && "ssh " + d.session.host, d.session.cwd, d.session.entrypoint].filter(Boolean).join(" · ");
+  $("mapMeta").title = $("mapMeta").textContent;
+  for (const [key, label] of FILTERS) {
+    const count = key === "all" ? totals.total : totals[key];
+    const button = $("filter-" + key);
+    button.textContent = `${label} ${count}`;
+    button.classList.toggle("on", key === ui.filter);
+    button.setAttribute("aria-pressed", String(key === ui.filter));
+  }
+  $("listView").classList.toggle("on", ui.view !== "graph");
+  $("graphView").classList.toggle("on", ui.view === "graph");
+  $("listView").setAttribute("aria-pressed", String(ui.view !== "graph"));
+  $("graphView").setAttribute("aria-pressed", String(ui.view === "graph"));
+  const path = Nav.pathTo(index, ui.focus);
+  const crumbSignature = JSON.stringify(path.map(id => [id, index.nodes.get(id).label]));
+  if ($("breadcrumbs").dataset.signature !== crumbSignature) {
+    $("breadcrumbs").replaceChildren(...path.flatMap((id, i) => [i ? h("span", {}, "›") : null,
+      h("button", { title: index.nodes.get(id).label, "aria-current": id === ui.focus ? "location" : null,
+        onclick: () => focusNode(id) }, id === "main" ? "主会话" : index.nodes.get(id).label)]).filter(Boolean));
+    $("breadcrumbs").dataset.signature = crumbSignature;
+    $("breadcrumbs").lastElementChild?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+  $("parentDot").className = "dot " + parent.status;
+  $("parentLabel").textContent = (ui.focus === "main" ? "主会话" : parent.label) + " · " + (STATUS[parent.status] || parent.status);
+  $("parentLabel").title = parent.label || "主会话";
+  $("parentStats").textContent = `直接子节点 ${direct.length} · 后代 ${stats.total} · 运行 ${stats.running} · 等待 ${stats.waiting} · 无更新 ${stats.stale}`;
+  $("backToMain").disabled = ui.focus === "main" && !ui.query;
+  $("agentsPrev").disabled = page.page === 0;
+  $("agentsNext").disabled = page.page + 1 >= page.pages;
+  $("pageSummary").textContent = `${ui.query ? "全会话搜索" : "本层筛选"} ${page.total} 个 · ${page.total ? page.offset + 1 : 0}–${page.offset + page.ids.length} · 共 ${page.pages} 页`;
+  $("pageJump").max = String(page.pages);
+  if (document.activeElement !== $("pageJump")) $("pageJump").value = page.page + 1;
+  $("mapNodes").className = ui.view === "graph" ? "focus-graph" : "";
+  keyedList($("mapNodes"), page.ids.map(id => index.nodes.get(id)), n => n.id, renderAgent, $("mapViewport"));
+  if (!page.ids.length) $("mapNodes").replaceChildren(h("div", { class: "empty" }, ui.query
+    ? "没有匹配的 agent，试试其他名称、工具或 ID" : ui.filter === "attention"
+      ? "这一层没有需要关注的任务。已结束任务可在下方展开。" : "这一层没有符合筛选的子节点"));
+  const closed = direct.filter(id => Nav.finished(index.nodes.get(id).status) && index.stats.get(id).attention === 0).length;
+  $("finishedSummary").hidden = !closed || ui.filter !== "attention" || !!ui.query;
+  if (closed) {
+    // Only replace this fixed control when its count changes.
+    if ($("finishedSummary").dataset.count !== String(closed)) {
+      $("finishedSummary").replaceChildren(h("span", {}, `本层已折叠 ${closed} 个已结束子节点 `),
+        h("button", { onclick: () => filterNodes("finished") }, "查看已结束任务"));
+      $("finishedSummary").dataset.count = String(closed);
+    }
+  }
+  const hiddenSelection = state.aid && !page.ids.includes(state.aid) && state.aid !== ui.focus && index.nodes.has(state.aid);
+  $("selectionHint").hidden = !hiddenSelection;
+  if (hiddenSelection && $("selectionHint").dataset.agent !== state.aid) {
+    $("selectionHint").replaceChildren(h("span", {}, "当前阅读的任务不在本页 "),
+      h("button", { onclick: () => locateAgent(state.aid) }, "定位当前记录"));
+    $("selectionHint").dataset.agent = state.aid;
+  }
+}
 
-  const renderNode = (n) => {
-    const kids = byParent[n.id] || [];
-    return h("li", {}, card(n), kids.length ? h("ul", { class: "children" }, kids.map(renderNode)) : null);
-  };
-  const renderGraphNode = (n) => {
-    const kids = byParent[n.id] || [];
-    return h("div", { class: "hn" }, gcard(n), kids.length ? h("div", { class: "hkids" }, kids.map(renderGraphNode)) : null);
-  };
-  const roots = byParent[""] || [];
-  const s = d.session;
-  const scroll = $("map").scrollTop, gscroll = $("map").querySelector(".graph")?.scrollLeft || 0;
-  const setView = (v) => () => { state.view = v; localStorage.setItem("agentView.view", v); renderMap(); };
-  const graph = state.view === "graph";
-  $("map").replaceChildren(
-    h("h2", { title: s.title }, s.title),
-    h("div", { class: "sub" }, [s.host && "ssh " + s.host, s.cwd, s.entrypoint, s.started && "开始于 " + ago(s.started)].filter(Boolean).join(" · ")),
-    h("div", { class: "counts" },
-      subs.length ? [
-        h("span", {}, "子 agent ", h("b", {}, subs.length)),
-        h("span", {}, "运行中 ", h("b", {}, c("running"))),
-        c("waiting") ? h("span", {}, "等待确认 ", h("b", {}, c("waiting"))) : null,
-        h("span", {}, "已完成 ", h("b", {}, c("done"))),
-        c("stale") ? h("span", {}, "无响应 ", h("b", {}, c("stale"))) : null,
-      ] : h("span", {}, "没有子 agent"),
-      h("span", { class: "viewsw" },
-        h("button", { class: graph ? "" : "on", onclick: setView("list") }, "列表"),
-        h("button", { class: graph ? "on" : "", onclick: setView("graph") }, "图"))),
-    graph ? h("div", { class: "graph" }, roots.map(renderGraphNode))
-          : h("ul", { class: "tree" }, roots.map(renderNode)));
-  $("map").scrollTop = scroll;
-  if (graph) $("map").querySelector(".graph").scrollLeft = gscroll;
-}
-function card(n) {
-  const end = active(n.status) ? now() : (n.last || n.mtime);
-  const elapsed = n.started ? end - n.started : null;
-  return h("div", { class: "card" + (n.id === state.aid ? " selected" : ""), onclick: () => selectAgent(n.id) },
-    h("div", { class: "row1" },
-      h("span", { class: "dot " + n.status }),
-      h("span", { class: "label", title: n.label }, n.id === "main" ? "主会话" : n.label),
-      n.background ? h("span", { class: "badge" }, "后台") : null,
-      h("span", { class: "badge" }, n.agent_type || "agent"),
-      h("span", { class: "st " + n.status }, STATUS[n.status] || n.status)),
-    n.tool ? h("div", { class: "tool", title: n.tool.brief },
-      h("span", { class: "n" }, n.tool.name), n.tool.brief || "",
-      n.tool.ts ? h("span", { "data-since": n.tool.ts, "data-prefix": "  · " }, "  · " + dur(now() - n.tool.ts)) : "") : null,
-    h("div", { class: "stats" },
-      elapsed != null ? h("span", active(n.status) ? { "data-since": n.started, "data-prefix": "" } : {},
-        dur(elapsed)) : null,
-      h("span", {}, `${n.tool_calls} 次工具`),
-      h("span", { title: "输出 token" }, "输出 " + ktok(n.out_tokens)),
-      n.context_tokens ? h("span", { title: "最近一次请求的上下文长度" }, "ctx " + ktok(n.context_tokens)) : null,
-      n.errors ? h("span", { class: "err" }, `${n.errors} 次出错`) : null,
-      n.top_tools.length ? h("span", { title: "最常用的工具" },
-        n.top_tools.map(([t, k]) => `${t}×${k}`).join(" ")) : null));
-}
-
-function gcard(n) {
-  const root = n.id === "main";
-  const end = active(n.status) ? now() : (n.last || n.mtime);
-  const elapsed = n.started ? end - n.started : null;
-  const meta = [];
-  if (root && n.model) meta.push(h("span", {}, n.model.replace(/^claude-/, "")));
-  if (elapsed != null) meta.push(h("span", active(n.status) ? { "data-since": n.started, "data-prefix": "" } : {}, dur(elapsed)));
-  if (n.out_tokens) meta.push(h("span", { title: "输出 token" }, "输出 " + ktok(n.out_tokens)));
-  if (n.context_tokens) meta.push(h("span", { title: "最近一次请求的上下文长度" }, "ctx " + ktok(n.context_tokens)));
-  if (n.errors) meta.push(h("span", { class: "err", title: `${n.errors} 次出错` }, `✕${n.errors}`));
-  const sep = meta.flatMap((m, i) => i ? [" · ", m] : [m]);
-  return h("div", { class: "gcard" + (root ? " root" : "") + (n.id === state.aid ? " selected" : ""),
-                    onclick: () => selectAgent(n.id),
-                    title: `${root ? "主会话" : n.label}\n${STATUS[n.status] || n.status} · ${n.tool_calls} 次工具` +
-                           (n.agent_type && !root ? ` · ${n.agent_type}` : "") + (n.background ? " · 后台" : "") },
-    h("div", { class: "t" }, h("span", { class: "dot " + n.status }),
-      h("span", { class: "label" }, root ? (state.detail?.session?.title || "主会话") : n.label)),
-    h("div", { class: "m" }, ...sep),
-    n.tool && active(n.status) ? h("div", { class: "tl" }, h("span", { class: "n" }, n.tool.name), n.tool.brief || "") : null);
-}
 
 // ------------------------------------------------------------------ transcript
 function selectAgent(aid) {
@@ -622,7 +944,47 @@ function updateHash() {
   history.replaceState(null, "", "#" + p.toString());
 }
 
-$("onlyActive").onchange = renderSessions;
+function resetSessionSearch() {
+  state.projectOffset = 0; state.projectOpen = undefined; state.projectSessions = null;
+  state.projectRequest++; state.sidebarRequest++;
+  loadSessions().catch(showCatalogError);
+}
+$("onlyActive").onchange = resetSessionSearch;
+$("sessionQuery").addEventListener("input", debounce(resetSessionSearch, 250));
+$("projectsPrev").onclick = () => {
+  state.projectOffset = Math.max(0, state.projectOffset - 20); state.projectOpen = undefined;
+  loadSessions().catch(showCatalogError);
+};
+$("projectsNext").onclick = () => {
+  if (state.catalog?.next_offset == null) return;
+  state.projectOffset = state.catalog.next_offset; state.projectOpen = undefined;
+  loadSessions().catch(showCatalogError);
+};
+$("currentSession").onclick = () => {
+  $("sessionQuery").value = ""; $("onlyActive").checked = false; state.projectOffset = 0;
+  loadSessions(true).catch(showCatalogError);
+};
+for (const [key, label] of FILTERS) $("mapCounts").append(h("button", {
+  id: "filter-" + key, onclick: () => filterNodes(key),
+  title: key === "stale" ? "一段时间没有新记录，可能是根据 transcript 推断的状态" : label }, label));
+$("agentQuery").addEventListener("input", () => {
+  if (!state.nav) return;
+  const query = $("agentQuery").value.trim();
+  if (query && !state.nav.query) state.nav.filter = "all";
+  state.nav.query = query; state.nav.page = 0;
+  renderMap(); $("mapViewport").scrollTop = 0;
+});
+function setMapView(view) {
+  if (!state.nav) return;
+  state.nav.view = view; renderMap(); rememberNavigation();
+}
+$("listView").onclick = () => setMapView("list");
+$("graphView").onclick = () => setMapView("graph");
+$("parentRecord").onclick = () => { if (state.nav) selectAgent(state.nav.focus); };
+$("backToMain").onclick = () => focusNode("main");
+$("agentsPrev").onclick = () => { if (state.nav) setAgentPage(state.nav.page - 1); };
+$("agentsNext").onclick = () => { if (state.nav) setAgentPage(state.nav.page + 1); };
+$("pageJump").onchange = () => setAgentPage(Math.max(0, Number($("pageJump").value) - 1));
 $("toggleSessions").onclick = () => document.body.classList.toggle("show-sessions");
 $("closeDetail").onclick = () => { showDetail(false); updateHash(); renderMap(); };
 $("loadFull").onclick = () => { state.full = true; loadTranscript(false); };
@@ -637,7 +999,10 @@ setInterval(() => {
   const p = new URLSearchParams(location.hash.slice(1));
   if (embedded && window.__AGENT_VIEW_DESKTOP_SESSION__) p.set("s", window.__AGENT_VIEW_DESKTOP_SESSION__);
   if (p.get("s")) { state.sid = p.get("s"); state.aid = p.get("a"); }
-  loadSessions().catch((e) => $("map").replaceChildren(h("div", { class: "empty" }, "连不上服务：" + e.message)));
+  loadSessions(!!state.sid).catch((e) => {
+    showCatalogError(e);
+    $("mapNodes").replaceChildren(h("div", { class: "empty" }, "连不上服务：" + e.message));
+  });
   if (state.sid) { loadDetail(); if (state.aid) { showDetail(true); loadTranscript(true); } }
   connect();
 })();
