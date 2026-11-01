@@ -1,5 +1,9 @@
 # Desktop SSH sidebar patch
 
+For the native Windows build (including its signed MSIX layout), use
+[the Windows guide](windows.md). The Linux installer below targets the Linux
+repackaging; `native.mjs` handles native double-ASAR bundles separately.
+
 `desktop-patch/` adds an **Agent View** button to SSH sessions in Claude Desktop on
 Linux. Clicking it opens that session's dashboard in Desktop's right sidebar. This
 page covers what the patch changes, how to install and check it, what happens on

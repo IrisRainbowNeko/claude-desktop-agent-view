@@ -19,13 +19,15 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from platform_support import background_options, state_dir
+
 URL = os.environ.get("AGENT_VIEW_URL", "http://127.0.0.1:7777").rstrip("/") + "/event"
 MAX_FIELD = 2000  # tool_response / tool_input can be huge; the dashboard only needs a preview
 # If the server is down, these events start it in the background (AGENT_VIEW_AUTOSTART=0 disables).
 # UserPromptSubmit covers sessions that were already open when the server went away.
 AUTOSTART_EVENTS = {"SessionStart", "UserPromptSubmit"}
 SERVER = Path(__file__).resolve().parent / "server.py"
-LOG = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "agent-view.log"
+LOG = state_dir() / "agent-view.log"
 
 
 def _trim(value):
@@ -78,7 +80,7 @@ def start_server():
             subprocess.Popen(
                 [sys.executable, str(SERVER), "--host", "127.0.0.1", "--port", str(u.port or 80)],
                 stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-                start_new_session=True, close_fds=True,
+                **background_options(detached=True),
             )
         return True
     except Exception:

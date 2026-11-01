@@ -302,7 +302,7 @@ def subagent_files(session_path):
 
 def read_meta(agent_path):
     try:
-        return json.loads(agent_path.with_suffix(".meta.json").read_text())
+        return json.loads(agent_path.with_suffix(".meta.json").read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):
         return {}
 
@@ -570,7 +570,7 @@ class DesktopFocus:
             try:
                 m = f.stat().st_mtime
                 if self.records.get(f, (None,))[0] != m:
-                    d = json.loads(f.read_text())
+                    d = json.loads(f.read_text(encoding="utf-8-sig"))
                     self.records[f] = (m, d.get("cliSessionId"), d.get("lastFocusedAt") or 0)
             except (OSError, ValueError):
                 pass
@@ -594,7 +594,7 @@ def desktop_transcript_id(session_id, roots=None):
     for root in roots:
         for record in root.glob(f"*/*/{session_id}.json"):
             try:
-                sid = json.loads(record.read_text()).get("cliSessionId")
+                sid = json.loads(record.read_text(encoding="utf-8-sig")).get("cliSessionId")
                 if isinstance(sid, str) and re.fullmatch(uuid, sid):
                     ids.add(sid)
             except (OSError, ValueError):

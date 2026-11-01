@@ -35,6 +35,9 @@ KaTeX, all MIT). The server inlines it into the page. To rebuild it, run
 
 ## Usage
 
+Windows users: see [the Windows guide](docs/windows.md) for native Python hooks,
+background startup and the optional Desktop SSH sidebar patch.
+
 1. Start the server. Pick one of these:
    - In Desktop, open the Browser pane and choose the `agent-view` config
      (from `.claude/launch.json`), or ask Claude to open it. The config runs
